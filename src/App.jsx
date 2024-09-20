@@ -1,5 +1,12 @@
+import {
+  useCallback,
+  forwardRef,
+  useState,
+  useMemo,
+  useRef,
+  memo,
+} from "react";
 import { AgGridReact } from "ag-grid-react";
-import { useMemo } from "react";
 import { csv } from "d3-fetch";
 
 import { usePromise } from "./hooks/usePromise";
@@ -23,10 +30,6 @@ const isStringNumeric = (param) => {
 
   return !methods.some((method) => !method(param));
 };
-
-const groupHeaderName = "Program";
-
-const amountHeaderName = "Distinct Students";
 
 const groupRowsByColumns = (
   rows = [],
@@ -90,6 +93,48 @@ const groupRowsByColumns = (
 
 // no need to show subset in pie chart
 // what to do in bar chart when one student? (something simpler)
+
+const formatValue2DecimalPlaces = ({ value }) =>
+  value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const gridOneColumnDefs = [
+  { headerName: "Program", field: "group" },
+  { headerName: "Distinct Students", field: "amount", sort: "asc" },
+];
+
+const gridTwoColumnDefs = [
+  { headerName: "EKU ID", field: "eku_id" },
+  { headerName: "Last Name", field: "last_name" },
+  { headerName: "First Name", field: "first_name" },
+  { field: "student_waiver_type", headerName: "Type" },
+  {
+    valueFormatter: formatValue2DecimalPlaces,
+    field: "student_amount",
+    headerName: "Waiver $",
+    sort: "desc",
+  },
+  { field: "student_term_quantity", headerName: "Enrolled" },
+  {
+    valueFormatter: formatValue2DecimalPlaces,
+    field: "enrolled_hours",
+    headerName: "Hours",
+  },
+];
+
+// const selection = {
+//   enableClickSelection: true,
+//   mode: "singleRow",
+//   checkboxes: false,
+// };
+
+const autoSizeStrategy = { type: "fitCellContents" };
+
+const selection = { checkboxes: false, mode: "multiRow" };
+
+const onSelectionChanged = ({ api }) => api.onFilterChanged();
 
 export default function App() {
   const data = usePromise(dataPromise);
@@ -155,30 +200,160 @@ export default function App() {
     [rows]
   );
 
-  const gridOne = useMemo(
-    () => ({
-      columnDefs: [
-        { headerName: groupHeaderName, field: "group" },
-        { headerName: amountHeaderName, field: "amount", sort: "asc" },
-      ],
-      rowData: Object.entries(tree).map(([group, object]) => ({
-        amount: Object.keys(object).length,
-        group,
-      })),
-    }),
-    [tree]
+  const gridOneRowData = useMemo(
+    () => Object.values(programIndexedRows),
+    [programIndexedRows]
+  );
+
+  const gridTwoRowData = useMemo(
+    () => Object.values(studentIndexedRows),
+    [studentIndexedRows]
+  );
+
+  const gridOneRef = useRef();
+
+  const gridTwoRef = useRef();
+
+  const [clickedRows, setClickedRows] = useState({ nodes: [], api: null });
+
+  const onRowClicked = useCallback((params) => {
+    const { node: clickedNode, rowPinned, api } = params;
+
+    let node = clickedNode;
+
+    if (rowPinned === "top") {
+      api.forEachNode((unPinnedNode) => {
+        if (clickedNode.data === unPinnedNode.data) {
+          node = unPinnedNode;
+        }
+      });
+    }
+
+    api.deselectAll();
+
+    setClickedRows((state) => {
+      if (state.api) state.api.deselectAll();
+
+      return {
+        nodes:
+          state.api !== api
+            ? [node]
+            : state.nodes.some((element) => element === node)
+            ? state.nodes.filter((element) => element !== node)
+            : [...state.nodes, node],
+        api,
+      };
+    });
+  }, []);
+
+  const isExternalFilterPresent = useCallback(
+    () => clickedRows.api && clickedRows.nodes.length > 0,
+    [clickedRows]
+  );
+
+  if (isExternalFilterPresent()) {
+    clickedRows.api.setNodesSelected({
+      nodes: clickedRows.nodes,
+      newValue: true,
+    });
+  }
+
+  const gridOneIsFiltered =
+    isExternalFilterPresent() && clickedRows.api === gridTwoRef.current.api;
+
+  const gridTwoIsFiltered =
+    isExternalFilterPresent() && clickedRows.api === gridOneRef.current.api;
+
+  const gridOneIDsSubset = useMemo(
+    () =>
+      gridOneIsFiltered &&
+      new Set(
+        clickedRows.nodes
+          .map(({ data: { eku_id } }) => [...studentProgramMap[eku_id]])
+          .flat()
+      ),
+    [clickedRows, studentProgramMap, gridOneIsFiltered]
+  );
+
+  const gridTwoIDsSubset = useMemo(
+    () =>
+      gridTwoIsFiltered &&
+      new Set(
+        clickedRows.nodes
+          .map(({ data: { group } }) => [...programStudentMap[group]])
+          .flat()
+      ),
+
+    [clickedRows, programStudentMap, gridTwoIsFiltered]
+  );
+
+  const gridOneDoesExternalFilterPass = useCallback(
+    (node) => !gridOneIDsSubset || gridOneIDsSubset.has(node.data.group),
+    [gridOneIDsSubset]
+  );
+
+  const gridTwoDoesExternalFilterPass = useCallback(
+    (node) => !gridTwoIDsSubset || gridTwoIDsSubset.has(node.data.eku_id),
+    [gridTwoIDsSubset]
+  );
+
+  const pinnedTopRowData = useMemo(
+    () => clickedRows.nodes.map(({ data }) => data),
+    [clickedRows]
+  );
+
+  const gridOnePinnedTopRowData = useMemo(
+    () => (gridTwoIsFiltered ? pinnedTopRowData : []),
+    [gridTwoIsFiltered, pinnedTopRowData]
+  );
+
+  const gridTwoPinnedTopRowData = useMemo(
+    () => (gridOneIsFiltered ? pinnedTopRowData : []),
+    [gridOneIsFiltered, pinnedTopRowData]
   );
 
   return (
     <main className="container">
       <div className="my-3 p-3 bg-body rounded shadow-sm">
-        <div className="ag-theme-quartz" style={{ height: 500 }}>
-          <AgGridReact
-            autoSizeStrategy={{ type: "fitCellContents" }}
-            {...gridOne}
-          />
+        <div className="row">
+          <div className="col">
+            <div className="ag-theme-balham" style={{ height: 500 }}>
+              <MemoizedGrid
+                doesExternalFilterPass={gridOneDoesExternalFilterPass}
+                isExternalFilterPresent={isExternalFilterPresent}
+                pinnedTopRowData={gridOnePinnedTopRowData}
+                onSelectionChanged={onSelectionChanged}
+                autoSizeStrategy={autoSizeStrategy}
+                columnDefs={gridOneColumnDefs}
+                onRowClicked={onRowClicked}
+                rowData={gridOneRowData}
+                selection={selection}
+                ref={gridOneRef}
+              ></MemoizedGrid>
+            </div>
+          </div>
+          <div className="col">
+            <div className="ag-theme-balham" style={{ height: 500 }}>
+              <MemoizedGrid
+                doesExternalFilterPass={gridTwoDoesExternalFilterPass}
+                isExternalFilterPresent={isExternalFilterPresent}
+                pinnedTopRowData={gridTwoPinnedTopRowData}
+                onSelectionChanged={onSelectionChanged}
+                autoSizeStrategy={autoSizeStrategy}
+                columnDefs={gridTwoColumnDefs}
+                onRowClicked={onRowClicked}
+                rowData={gridTwoRowData}
+                selection={selection}
+                ref={gridTwoRef}
+              ></MemoizedGrid>
+            </div>
+          </div>
         </div>
       </div>
     </main>
   );
 }
+
+const MemoizedGrid = memo(
+  forwardRef((props, ref) => <AgGridReact {...props} ref={ref}></AgGridReact>)
+);
