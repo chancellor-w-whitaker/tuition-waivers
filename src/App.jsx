@@ -1,10 +1,17 @@
 import {
   ResponsiveContainer,
+  CartesianGrid,
+  ComposedChart,
   PieChart,
+  BarChart,
   Tooltip,
   Legend,
+  XAxis,
+  YAxis,
   Cell,
+  Line,
   Pie,
+  Bar,
 } from "recharts";
 import { useCallback, useState, useMemo, useRef } from "react";
 
@@ -65,7 +72,42 @@ export default function App() {
     [rows]
   );
 
-  console.log(groupRows);
+  // console.log(groupRows);
+
+  const getTermCode = (termDesc) => {
+    let semester = termDesc.split(" ")[0].toLowerCase();
+
+    if (semester === "fall") {
+      semester = 3;
+    }
+
+    if (semester === "summer") {
+      semester = 2;
+    }
+
+    if (semester === "spring") {
+      semester = 1;
+    }
+
+    return Number(termDesc.split(" ")[1] + semester);
+  };
+
+  const barChartData = Object.values(
+    groupRowsByColumns(
+      groupRows.map((row) => ({
+        ...row,
+        student_term_quantity: 1,
+      })),
+      ["term_desc"],
+      ["student_amount", "student_term_quantity"]
+    ).tree
+  )
+    .map(({ row }) => row)
+    .sort(
+      ({ term_desc: a }, { term_desc: b }) => getTermCode(a) - getTermCode(b)
+    );
+
+  console.log(barChartData);
 
   const studentIndexedRows = useMemo(() => {
     const beforeGrouping = groupRows.map((row) => ({
@@ -250,12 +292,12 @@ export default function App() {
     ({ eku_id }) => !gridTwoIDsSubset || gridTwoIDsSubset.has(eku_id)
   );
 
-  console.log(
-    groupRowsByColumns(
-      somePieCellIsClicked ? gridTwoRowData : filteredGridTwoRowData,
-      ["student_waiver_type"]
-    )
-  );
+  // console.log(
+  //   groupRowsByColumns(
+  //     somePieCellIsClicked ? gridTwoRowData : filteredGridTwoRowData,
+  //     ["student_waiver_type"]
+  //   )
+  // );
 
   const pieChartData = Object.entries(
     groupRowsByColumns(
@@ -291,10 +333,10 @@ export default function App() {
   );
 
   return (
-    <MainContainer className="small">
+    <MainContainer style={{ fontSize: 14 }}>
       <MainSection>
         <Row>
-          <Col>
+          <div className="col-4">
             <AgThemeBalham>
               <AgGridReactMemoized
                 doesExternalFilterPass={gridOneDoesExternalFilterPass}
@@ -309,8 +351,8 @@ export default function App() {
                 ref={gridOneRef}
               ></AgGridReactMemoized>
             </AgThemeBalham>
-          </Col>
-          <Col>
+          </div>
+          <div className="col-8">
             <AgThemeBalham>
               <AgGridReactMemoized
                 doesExternalFilterPass={gridTwoDoesExternalFilterPass}
@@ -325,10 +367,10 @@ export default function App() {
                 ref={gridTwoRef}
               ></AgGridReactMemoized>
             </AgThemeBalham>
-          </Col>
+          </div>
         </Row>
         <Row>
-          <Col>
+          <div className="col-4">
             <ResponsiveContainer height={400}>
               <PieChart>
                 <Pie
@@ -336,7 +378,7 @@ export default function App() {
                   onClick={handlePieCellClick}
                   data={pieChartData}
                   labelLine={false}
-                  outerRadius={80}
+                  outerRadius={100}
                   dataKey="value"
                   fill="#8884d8"
                   cx="50%"
@@ -355,8 +397,28 @@ export default function App() {
                 <Legend></Legend>
               </PieChart>
             </ResponsiveContainer>
-          </Col>
-          <Col></Col>
+          </div>
+          <div className="col-8">
+            <ResponsiveContainer height={400}>
+              <ComposedChart data={barChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="term_desc" />
+                <YAxis orientation="left" stroke="#8884d8" yAxisId="left" />
+                <YAxis orientation="right" stroke="#82ca9d" yAxisId="right" />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="student_amount" yAxisId="left" fill="#8884d8" />
+                <Line
+                  dataKey="student_term_quantity"
+                  stroke="#82ca9d"
+                  yAxisId="right"
+                  strokeWidth={2}
+                  // type="monotone"
+                  fill="#82ca9d"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
         </Row>
       </MainSection>
     </MainContainer>

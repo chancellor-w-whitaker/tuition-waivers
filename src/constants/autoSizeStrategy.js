@@ -1,1 +1,1 @@
-export const autoSizeStrategy = { type: "fitCellContents" };
+export const autoSizeStrategy = { type: "fitGridWidth" };

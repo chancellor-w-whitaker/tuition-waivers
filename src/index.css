@@ -11,3 +11,8 @@
 .ag-header-select-all {
   display: none;
 }
+
+.ag-theme-quartz {
+  --ag-grid-size: 3px; /* very compact */
+  --ag-font-size: 10px;
+}

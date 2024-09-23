@@ -1,1 +1,5 @@
-export const selection = { checkboxes: false, mode: "multiRow" };
+export const selection = {
+  headerCheckbox: false,
+  checkboxes: false,
+  mode: "multiRow",
+};

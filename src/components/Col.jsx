@@ -1,3 +1,5 @@
 import { createComponent } from "../createComponent";
 
-export const Col = createComponent({ className: "col" });
+export const Col = createComponent({
+  className: "col",
+});
