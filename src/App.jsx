@@ -1,86 +1,21 @@
-import {
-  useCallback,
-  forwardRef,
-  useState,
-  useMemo,
-  useRef,
-  memo,
-} from "react";
-import { AgGridReact } from "ag-grid-react";
-import { csv } from "d3-fetch";
+import { useCallback, useState, useMemo, useRef } from "react";
+import { ResponsiveContainer, PieChart, Pie } from "recharts";
 
+import { AgGridReactMemoized } from "./components/AgGridReactMemoized";
+import { gridOneColumnDefs } from "./constants/gridOneColumnDefs";
+import { groupRowsByColumns } from "./helpers/groupRowsByColumns";
+import { gridTwoColumnDefs } from "./constants/gridTwoColumnDefs";
+import { onSelectionChanged } from "./helpers/onSelectionChanged";
+import { autoSizeStrategy } from "./constants/autoSizeStrategy";
+import { MainContainer } from "./components/MainContainer";
+import { AgThemeBalham } from "./components/AgThemeBalham";
+import { validateArray } from "./helpers/validateArray";
+import { MainSection } from "./components/MainSection";
+import { dataPromise } from "./constants/dataPromise";
+import { selection } from "./constants/selection";
 import { usePromise } from "./hooks/usePromise";
-
-const dataPromise = csv("data/data.csv");
-
-const validateArray = (array) => (Array.isArray(array) ? array : []);
-
-const isStringNumeric = (param) => {
-  const method1 = (string) => !Number.isNaN(string);
-
-  const method2 = (string) => /^[+-]?\d+(\.\d+)?$/.test(string);
-
-  const method3 = (string) => !Number.isNaN(Number(string));
-
-  const method4 = (string) => Number.isFinite(+string);
-
-  const method5 = (string) => string == Number.parseFloat(string);
-
-  const methods = [method1, method2, method3, method4, method5];
-
-  return !methods.some((method) => !method(param));
-};
-
-const groupRowsByColumns = (
-  rows = [],
-  groupColumns = [],
-  valueColumns = [],
-  extraColumns = []
-) => {
-  const tree = {};
-
-  const groupRows = [];
-
-  const isIndexOfLastGroupColumn = (index) => index === groupColumns.length - 1;
-
-  rows.forEach((row) => {
-    let branch = tree;
-
-    let leaf = Object.fromEntries([
-      ...valueColumns.map((valueColumn) => [valueColumn, 0]),
-      ...extraColumns.map((extraColumn) => [extraColumn, row[extraColumn]]),
-    ]);
-
-    groupColumns.forEach((groupColumn, index) => {
-      const segment = row[groupColumn];
-
-      leaf[groupColumn] = segment;
-
-      if (!(segment in branch)) {
-        if (!isIndexOfLastGroupColumn(index)) {
-          branch[segment] = {};
-        } else {
-          branch[segment] = { row: leaf, data: [] };
-        }
-      }
-
-      branch = branch[segment];
-    });
-
-    branch.data.push(row);
-
-    groupRows.push(branch.row);
-
-    valueColumns.forEach(
-      (valueColumn) =>
-        (branch.row[valueColumn] += isStringNumeric(row[valueColumn])
-          ? Number(row[valueColumn])
-          : 0)
-    );
-  });
-
-  return { groupRows, tree };
-};
+import { Row } from "./components/Row";
+import { Col } from "./components/Col";
 
 // dropdown to filter on term
 // default to only most recent selected
@@ -94,47 +29,11 @@ const groupRowsByColumns = (
 // no need to show subset in pie chart
 // what to do in bar chart when one student? (something simpler)
 
-const formatValue2DecimalPlaces = ({ value }) =>
-  value.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-const gridOneColumnDefs = [
-  { headerName: "Program", field: "group" },
-  { headerName: "Distinct Students", field: "amount", sort: "asc" },
-];
-
-const gridTwoColumnDefs = [
-  { headerName: "EKU ID", field: "eku_id" },
-  { headerName: "Last Name", field: "last_name" },
-  { headerName: "First Name", field: "first_name" },
-  { field: "student_waiver_type", headerName: "Type" },
-  {
-    valueFormatter: formatValue2DecimalPlaces,
-    field: "student_amount",
-    headerName: "Waiver $",
-    sort: "desc",
-  },
-  { field: "student_term_quantity", headerName: "Enrolled" },
-  {
-    valueFormatter: formatValue2DecimalPlaces,
-    field: "enrolled_hours",
-    headerName: "Hours",
-  },
-];
-
 // const selection = {
 //   enableClickSelection: true,
 //   mode: "singleRow",
 //   checkboxes: false,
 // };
-
-const autoSizeStrategy = { type: "fitCellContents" };
-
-const selection = { checkboxes: false, mode: "multiRow" };
-
-const onSelectionChanged = ({ api }) => api.onFilterChanged();
 
 export default function App() {
   const data = usePromise(dataPromise);
@@ -283,7 +182,6 @@ export default function App() {
           .map(({ data: { group } }) => [...programStudentMap[group]])
           .flat()
       ),
-
     [clickedRows, programStudentMap, gridTwoIsFiltered]
   );
 
@@ -296,6 +194,16 @@ export default function App() {
     (node) => !gridTwoIDsSubset || gridTwoIDsSubset.has(node.data.eku_id),
     [gridTwoIDsSubset]
   );
+
+  const filteredGridTwoRowData = gridTwoRowData.filter(
+    ({ eku_id }) => !gridTwoIDsSubset || gridTwoIDsSubset.has(eku_id)
+  );
+
+  const pieChartData = Object.entries(
+    groupRowsByColumns(filteredGridTwoRowData, ["student_waiver_type"]).tree
+  ).map(([name, { data }]) => ({ value: data.length, name }));
+
+  console.log(pieChartData);
 
   const pinnedTopRowData = useMemo(
     () => clickedRows.nodes.map(({ data }) => data),
@@ -313,15 +221,15 @@ export default function App() {
   );
 
   return (
-    <main className="container">
-      <div className="my-3 p-3 bg-body rounded shadow-sm">
-        <div className="row">
-          <div className="col">
-            <div className="ag-theme-balham" style={{ height: 500 }}>
-              <MemoizedGrid
+    <MainContainer>
+      <MainSection>
+        <Row>
+          <Col>
+            <AgThemeBalham>
+              <AgGridReactMemoized
                 doesExternalFilterPass={gridOneDoesExternalFilterPass}
                 isExternalFilterPresent={isExternalFilterPresent}
-                pinnedTopRowData={gridOnePinnedTopRowData}
+                // pinnedTopRowData={gridOnePinnedTopRowData}
                 onSelectionChanged={onSelectionChanged}
                 autoSizeStrategy={autoSizeStrategy}
                 columnDefs={gridOneColumnDefs}
@@ -329,15 +237,15 @@ export default function App() {
                 rowData={gridOneRowData}
                 selection={selection}
                 ref={gridOneRef}
-              ></MemoizedGrid>
-            </div>
-          </div>
-          <div className="col">
-            <div className="ag-theme-balham" style={{ height: 500 }}>
-              <MemoizedGrid
+              ></AgGridReactMemoized>
+            </AgThemeBalham>
+          </Col>
+          <Col>
+            <AgThemeBalham>
+              <AgGridReactMemoized
                 doesExternalFilterPass={gridTwoDoesExternalFilterPass}
                 isExternalFilterPresent={isExternalFilterPresent}
-                pinnedTopRowData={gridTwoPinnedTopRowData}
+                // pinnedTopRowData={gridTwoPinnedTopRowData}
                 onSelectionChanged={onSelectionChanged}
                 autoSizeStrategy={autoSizeStrategy}
                 columnDefs={gridTwoColumnDefs}
@@ -345,15 +253,29 @@ export default function App() {
                 rowData={gridTwoRowData}
                 selection={selection}
                 ref={gridTwoRef}
-              ></MemoizedGrid>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
+              ></AgGridReactMemoized>
+            </AgThemeBalham>
+          </Col>
+        </Row>
+        <Row>
+          <Col>
+            <ResponsiveContainer height={400}>
+              <PieChart>
+                <Pie
+                  data={pieChartData}
+                  outerRadius={80}
+                  dataKey="value"
+                  fill="#8884d8"
+                  cx="50%"
+                  cy="50%"
+                  label
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </Col>
+          <Col></Col>
+        </Row>
+      </MainSection>
+    </MainContainer>
   );
 }
-
-const MemoizedGrid = memo(
-  forwardRef((props, ref) => <AgGridReact {...props} ref={ref}></AgGridReact>)
-);

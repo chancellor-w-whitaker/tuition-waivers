@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+// inspired by custom useData hook found here: https://react.dev/learn/reusing-logic-with-custom-hooks#when-to-use-custom-hooks
+
 export const usePromise = (promise) => {
   const [state, setState] = useState(null);
 
@@ -7,7 +9,7 @@ export const usePromise = (promise) => {
     if (promise) {
       let ignore = false;
 
-      promise.then((value) => !ignore && setState(value));
+      promise.then((json) => !ignore && setState(json));
 
       return () => {
         ignore = true;
