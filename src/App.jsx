@@ -1,5 +1,12 @@
+import {
+  ResponsiveContainer,
+  PieChart,
+  Tooltip,
+  Legend,
+  Cell,
+  Pie,
+} from "recharts";
 import { useCallback, useState, useMemo, useRef } from "react";
-import { ResponsiveContainer, PieChart, Pie } from "recharts";
 
 import { AgGridReactMemoized } from "./components/AgGridReactMemoized";
 import { gridOneColumnDefs } from "./constants/gridOneColumnDefs";
@@ -40,6 +47,13 @@ export default function App() {
 
   const rows = useMemo(() => validateArray(data), [data]);
 
+  // console.log(rows);
+
+  // filter out empty waiver type
+  // small font
+  // right table wider column than left
+  // charts underneath can be same width column (pie chart might need to be shrunk)
+
   const { groupRows, tree } = useMemo(
     () =>
       groupRowsByColumns(
@@ -50,6 +64,8 @@ export default function App() {
       ),
     [rows]
   );
+
+  console.log(groupRows);
 
   const studentIndexedRows = useMemo(() => {
     const beforeGrouping = groupRows.map((row) => ({
@@ -145,45 +161,80 @@ export default function App() {
     });
   }, []);
 
+  const [activePieCell, setActivePieCell] = useState(null);
+
+  const someRowsAreClicked = clickedRows.api && clickedRows.nodes.length > 0;
+
+  const somePieCellIsClicked = activePieCell !== null;
+
   const isExternalFilterPresent = useCallback(
-    () => clickedRows.api && clickedRows.nodes.length > 0,
-    [clickedRows]
+    () => someRowsAreClicked || somePieCellIsClicked,
+    [someRowsAreClicked, somePieCellIsClicked]
   );
 
-  if (isExternalFilterPresent()) {
+  if (someRowsAreClicked) {
     clickedRows.api.setNodesSelected({
       nodes: clickedRows.nodes,
       newValue: true,
     });
   }
 
-  const gridOneIsFiltered =
-    isExternalFilterPresent() && clickedRows.api === gridTwoRef.current.api;
+  const gridTwoHasClickedRows =
+    someRowsAreClicked && clickedRows.api === gridTwoRef.current.api;
 
-  const gridTwoIsFiltered =
-    isExternalFilterPresent() && clickedRows.api === gridOneRef.current.api;
+  const gridOneHasClickedRows =
+    someRowsAreClicked && clickedRows.api === gridOneRef.current.api;
 
-  const gridOneIDsSubset = useMemo(
-    () =>
-      gridOneIsFiltered &&
-      new Set(
-        clickedRows.nodes
-          .map(({ data: { eku_id } }) => [...studentProgramMap[eku_id]])
-          .flat()
-      ),
-    [clickedRows, studentProgramMap, gridOneIsFiltered]
-  );
-
-  const gridTwoIDsSubset = useMemo(
-    () =>
-      gridTwoIsFiltered &&
-      new Set(
+  const gridTwoIDsSubset = useMemo(() => {
+    if (gridOneHasClickedRows) {
+      return new Set(
         clickedRows.nodes
           .map(({ data: { group } }) => [...programStudentMap[group]])
           .flat()
-      ),
-    [clickedRows, programStudentMap, gridTwoIsFiltered]
-  );
+      );
+    }
+
+    if (somePieCellIsClicked) {
+      return new Set(
+        gridTwoRowData
+          .filter(
+            ({ student_waiver_type }) => student_waiver_type === activePieCell
+          )
+          .map(({ eku_id }) => eku_id)
+      );
+    }
+  }, [
+    clickedRows,
+    activePieCell,
+    gridTwoRowData,
+    programStudentMap,
+    somePieCellIsClicked,
+    gridOneHasClickedRows,
+  ]);
+
+  const gridOneIDsSubset = useMemo(() => {
+    if (gridTwoHasClickedRows) {
+      return new Set(
+        clickedRows.nodes
+          .map(({ data: { eku_id } }) => [...studentProgramMap[eku_id]])
+          .flat()
+      );
+    }
+
+    if (somePieCellIsClicked) {
+      return new Set(
+        [...gridTwoIDsSubset]
+          .map((eku_id) => [...studentProgramMap[eku_id]])
+          .flat()
+      );
+    }
+  }, [
+    clickedRows,
+    gridTwoIDsSubset,
+    studentProgramMap,
+    somePieCellIsClicked,
+    gridTwoHasClickedRows,
+  ]);
 
   const gridOneDoesExternalFilterPass = useCallback(
     (node) => !gridOneIDsSubset || gridOneIDsSubset.has(node.data.group),
@@ -199,11 +250,30 @@ export default function App() {
     ({ eku_id }) => !gridTwoIDsSubset || gridTwoIDsSubset.has(eku_id)
   );
 
+  console.log(
+    groupRowsByColumns(
+      somePieCellIsClicked ? gridTwoRowData : filteredGridTwoRowData,
+      ["student_waiver_type"]
+    )
+  );
+
   const pieChartData = Object.entries(
-    groupRowsByColumns(filteredGridTwoRowData, ["student_waiver_type"]).tree
+    groupRowsByColumns(
+      somePieCellIsClicked ? gridTwoRowData : filteredGridTwoRowData,
+      ["student_waiver_type"]
+    ).tree
   ).map(([name, { data }]) => ({ value: data.length, name }));
 
-  console.log(pieChartData);
+  const handlePieCellClick = (e) => {
+    setActivePieCell((name) => (e.name === name ? null : e.name));
+
+    setClickedRows({ nodes: [], api: null });
+  };
+
+  if (someRowsAreClicked && somePieCellIsClicked) setActivePieCell(null);
+
+  const getPieCellFillOpacity = (name) =>
+    activePieCell !== null && name !== activePieCell ? 0.375 : 1;
 
   const pinnedTopRowData = useMemo(
     () => clickedRows.nodes.map(({ data }) => data),
@@ -211,17 +281,17 @@ export default function App() {
   );
 
   const gridOnePinnedTopRowData = useMemo(
-    () => (gridTwoIsFiltered ? pinnedTopRowData : []),
-    [gridTwoIsFiltered, pinnedTopRowData]
+    () => (gridOneHasClickedRows ? pinnedTopRowData : []),
+    [gridOneHasClickedRows, pinnedTopRowData]
   );
 
   const gridTwoPinnedTopRowData = useMemo(
-    () => (gridOneIsFiltered ? pinnedTopRowData : []),
-    [gridOneIsFiltered, pinnedTopRowData]
+    () => (gridTwoHasClickedRows ? pinnedTopRowData : []),
+    [gridTwoHasClickedRows, pinnedTopRowData]
   );
 
   return (
-    <MainContainer>
+    <MainContainer className="small">
       <MainSection>
         <Row>
           <Col>
@@ -262,14 +332,27 @@ export default function App() {
             <ResponsiveContainer height={400}>
               <PieChart>
                 <Pie
+                  label={renderCustomizedLabel}
+                  onClick={handlePieCellClick}
                   data={pieChartData}
+                  labelLine={false}
                   outerRadius={80}
                   dataKey="value"
                   fill="#8884d8"
                   cx="50%"
                   cy="50%"
-                  label
-                />
+                >
+                  {pieChartData.map(({ name }, index) => (
+                    <Cell
+                      fillOpacity={getPieCellFillOpacity(name)}
+                      fill={COLORS[index % COLORS.length]}
+                      key={`cell-${index}`}
+                      cursor="pointer"
+                    />
+                  ))}
+                </Pie>
+                <Tooltip></Tooltip>
+                <Legend></Legend>
               </PieChart>
             </ResponsiveContainer>
           </Col>
@@ -279,3 +362,32 @@ export default function App() {
     </MainContainer>
   );
 }
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+
+const RADIAN = Math.PI / 180;
+
+const renderCustomizedLabel = ({
+  innerRadius,
+  outerRadius,
+  midAngle,
+  percent,
+  cx,
+  cy,
+}) => {
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      textAnchor={x > cx ? "start" : "end"}
+      dominantBaseline="central"
+      fill="white"
+      x={x}
+      y={y}
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
