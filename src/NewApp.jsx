@@ -118,6 +118,8 @@ const ActiveShapePieChart = ({
   const [previousData, setPreviousData] = useState(data);
 
   if (previousData !== data) {
+    // if activeCellName goes missing, pick a different one
+
     setPreviousData(data);
 
     if (previousData.length === 0 && data.length > 0) {

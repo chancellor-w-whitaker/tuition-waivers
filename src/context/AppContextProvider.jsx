@@ -241,7 +241,9 @@ export const AppContextProvider = ({ children }) => {
   // need scrollPosition to un-reset when clicking a selection on a grid
   // need the ability to filter by many options on grid again
   // term dropdown filter
+  // bar y axis labels
   // other ease-of-use & style changes
+  // consider stacking filters with ctrl button like in power-bi
 
   const programGridRef = useRef();
 
