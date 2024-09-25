@@ -16,3 +16,49 @@
   --ag-grid-size: 3px; /* very compact */
   --ag-font-size: 10px;
 }
+
+.recharts-surface {
+  overflow: visible;
+}
+
+/*! CSS Used from: https://getbootstrap.com/docs/5.3/assets/css/docs.css */
+.grid {
+  display: grid;
+  grid-template-rows: repeat(var(--bs-rows, 1), 1fr);
+  grid-template-columns: repeat(var(--bs-columns, 12), 1fr);
+  gap: var(--bs-gap, 1.5rem);
+}
+.grid .g-col-6 {
+  grid-column: auto/span 6;
+}
+.bd-example {
+  --bd-example-padding: 1rem;
+  position: relative;
+  padding: var(--bd-example-padding);
+  margin: 0 -1.5rem 1rem;
+  border: solid var(--bs-border-color);
+  border-width: 1px 0;
+}
+.bd-example::after {
+  display: block;
+  clear: both;
+  content: "";
+}
+@media (min-width: 768px) {
+  .bd-example {
+    --bd-example-padding: 1.5rem;
+    margin-right: 0;
+    margin-left: 0;
+    border-width: 1px;
+    border-radius: var(--bs-border-radius);
+  }
+}
+.bd-example > :last-child {
+  margin-bottom: 0;
+}
+.bd-example-cssgrid [class*="grid"] > * {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  background-color: rgba(var(--bd-violet-rgb), 0.15);
+  border: 1px solid rgba(var(--bd-violet-rgb), 0.3);
+}

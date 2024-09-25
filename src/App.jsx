@@ -3,7 +3,6 @@ import {
   CartesianGrid,
   ComposedChart,
   PieChart,
-  BarChart,
   Tooltip,
   Legend,
   XAxis,
@@ -15,6 +14,7 @@ import {
 } from "recharts";
 import { useCallback, useState, useMemo, useRef } from "react";
 
+import { renderCustomizedLabel } from "./components/renderCustomizedLabel";
 import { AgGridReactMemoized } from "./components/AgGridReactMemoized";
 import { gridOneColumnDefs } from "./constants/gridOneColumnDefs";
 import { groupRowsByColumns } from "./helpers/groupRowsByColumns";
@@ -26,10 +26,11 @@ import { AgThemeBalham } from "./components/AgThemeBalham";
 import { validateArray } from "./helpers/validateArray";
 import { MainSection } from "./components/MainSection";
 import { dataPromise } from "./constants/dataPromise";
+import { getTermCode } from "./helpers/getTermCode";
 import { selection } from "./constants/selection";
 import { usePromise } from "./hooks/usePromise";
+import { colors } from "./constants/colors";
 import { Row } from "./components/Row";
-import { Col } from "./components/Col";
 
 // dropdown to filter on term
 // default to only most recent selected
@@ -49,17 +50,333 @@ import { Col } from "./components/Col";
 //   checkboxes: false,
 // };
 
+const groupBy = (
+  rows = [],
+  groupByColumns = [],
+  sumUpColumns = [],
+  supplementalColumns = []
+) => {
+  const isStringNumeric = (param) => {
+    const method1 = (string) => !Number.isNaN(string);
+
+    const method2 = (string) => /^[+-]?\d+(\.\d+)?$/.test(string);
+
+    const method3 = (string) => !Number.isNaN(Number(string));
+
+    const method4 = (string) => Number.isFinite(+string);
+
+    const method5 = (string) => string == Number.parseFloat(string);
+
+    const methods = [method1, method2, method3, method4, method5];
+
+    return !methods.some((method) => !method(param));
+  };
+
+  const getNumberEntries = (row) =>
+    sumUpColumns
+      .map((column) => [column, row[column]])
+      .filter(([key, value]) => isStringNumeric(value));
+
+  const getSupplementalValues = (row) =>
+    Object.fromEntries(
+      supplementalColumns.map((column) => [column, row[column]])
+    );
+
+  const zeroedSums = Object.fromEntries(
+    sumUpColumns.map((column) => [column, 0])
+  );
+
+  const groupedRows = [];
+
+  const tree = { parent: { ...zeroedSums }, distinct: {}, children: {} };
+
+  groupedRows.push({ distinct: tree.distinct, row: tree.parent });
+
+  rows.forEach((row) => {
+    const numberEntries = getNumberEntries(row);
+
+    let node = tree;
+
+    numberEntries.forEach(
+      ([column, number]) => (node.parent[column] += Number(number))
+    );
+
+    let pairs = {};
+
+    let ancestorCounters = [];
+
+    groupByColumns.forEach((column) => {
+      const value = row[column];
+
+      pairs[column] = value;
+
+      ancestorCounters.push(node.distinct);
+
+      if (!(value in node.children)) {
+        node.children[value] = {
+          parent: { ...pairs, ...zeroedSums, ...getSupplementalValues(row) },
+          level: column,
+          distinct: {},
+          children: {},
+        };
+
+        const { distinct, parent, level } = node.children[value];
+
+        groupedRows.push({
+          row: parent,
+          distinct,
+          level,
+        });
+
+        ancestorCounters.forEach((object) => {
+          if (!(column in object)) {
+            object[column] = 0;
+          }
+
+          object[column]++;
+        });
+      }
+
+      node = node.children[value];
+
+      numberEntries.forEach(
+        ([column, number]) => (node.parent[column] += Number(number))
+      );
+    });
+  });
+
+  return { array: groupedRows, tree };
+};
+
+let USDollar = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+const formatWithCommas = (number) => number.toLocaleString();
+
+const headerNames = {
+  distinct_eku_id: "Distinct Students",
+  distinct_term_desc: "Enrolled",
+  student_waiver_type: "Type",
+  student_amount: "Waiver $",
+  first_name: "First Name",
+  program_desc: "Program",
+  enrolled_hours: "Hours",
+  last_name: "Last Name",
+  eku_id: "EKU ID",
+};
+
+const valueFormatters = {};
+
+const chartProperties = {
+  barChart: {
+    xAxis: {
+      right: {
+        valueFormatter: (value) => value.toLocaleString(),
+        label: "Students",
+      },
+      left: {
+        valueFormatter: (value) => USDollar.format(value),
+        label: "Waiver $",
+      },
+    },
+    xAxisLabels: { right: "Students", left: "Waiver $" },
+    colors: { lines: "#009681", bars: "#DC5829" },
+    title: "Waivers & Students by Semester",
+  },
+  pieChart: {
+    colors: { Dependent: "#861F41", Employee: "#E6A65D" },
+    title: "Waiver Type",
+  },
+};
+
+const getColumnDefs = (rowData) =>
+  rowData.length > 0
+    ? Object.keys(rowData[0]).map((field) => ({
+        headerName: field in headerNames ? headerNames.field : field,
+        field,
+      }))
+    : [];
+
 export default function App() {
-  const data = usePromise(dataPromise);
+  const originalData = usePromise(dataPromise);
 
-  const rows = useMemo(() => validateArray(data), [data]);
+  const [filterBy, setFilterBy] = useState();
 
-  // console.log(rows);
+  const filteredData = useMemo(() => {
+    if (filterBy && Array.isArray(originalData)) {
+      const { value, key } = filterBy;
 
-  // filter out empty waiver type
-  // small font
-  // right table wider column than left
-  // charts underneath can be same width column (pie chart might need to be shrunk)
+      return originalData.filter((row) => row[key] === value);
+    }
+  }, [filterBy, originalData]);
+
+  const getVisualizationData = useCallback(
+    (visualizationID) =>
+      filterBy && filterBy.key !== visualizationID
+        ? filteredData
+        : originalData,
+    [filteredData, originalData, filterBy]
+  );
+
+  const updateFilterBy = ({ value, key }) =>
+    setFilterBy((state) =>
+      state && state.value === value && state.key === key
+        ? null
+        : { value, key }
+    );
+
+  const programData = useMemo(() => {
+    const visualizationID = "program_desc";
+
+    const data = getVisualizationData(visualizationID);
+
+    if (Array.isArray(data)) {
+      const groupedData = groupBy(data, [visualizationID, "eku_id"]);
+
+      const rowData = groupedData.array
+        .filter(({ level }) => level === visualizationID)
+        .map(({ distinct, row }) => ({
+          ...row,
+          distinct_eku_id: distinct.eku_id,
+        }));
+
+      const pinnedBottomRowData = [
+        {
+          ...groupedData.array[0].row,
+          ...groupedData.array[0].distinct,
+          [visualizationID]: "Total",
+        },
+      ];
+
+      const columnDefs = getColumnDefs(rowData);
+
+      return {
+        id: visualizationID,
+        pinnedBottomRowData,
+        columnDefs,
+        rowData,
+      };
+    }
+
+    return {
+      pinnedBottomRowData: [],
+      id: visualizationID,
+      columnDefs: [],
+      rowData: [],
+    };
+  }, [getVisualizationData]);
+
+  console.log(programData);
+
+  const studentData = useMemo(() => {
+    const visualizationID = "eku_id";
+
+    const data = getVisualizationData(visualizationID);
+
+    if (Array.isArray(data)) {
+      const groupedData = groupBy(
+        data,
+        [visualizationID, "term_desc"],
+        ["student_amount", "enrolled_hours"],
+        ["last_name", "first_name", "student_waiver_type"]
+      );
+
+      const rowData = groupedData.array
+        .filter(({ level }) => level === visualizationID)
+        .map(({ distinct, row }) => ({
+          ...row,
+          distinct_term_desc: distinct.term_desc,
+        }));
+
+      const pinnedBottomRowData = [
+        {
+          ...groupedData.array[0].row,
+          ...groupedData.array[0].distinct,
+          [visualizationID]: "Total",
+        },
+      ];
+
+      const columnDefs = getColumnDefs(rowData);
+
+      return { id: visualizationID, pinnedBottomRowData, columnDefs, rowData };
+    }
+
+    return {
+      pinnedBottomRowData: [],
+      id: visualizationID,
+      columnDefs: [],
+      rowData: [],
+    };
+  }, [getVisualizationData]);
+
+  const waiverTypeData = useMemo(() => {
+    const visualizationID = "student_waiver_type";
+
+    const data = getVisualizationData(visualizationID);
+
+    if (data) {
+      const groupedData = groupBy(data, [visualizationID, "eku_id"]);
+
+      const rowData = groupedData.array
+        .filter(({ level }) => level === visualizationID)
+        .map(({ distinct, row }) => ({
+          ...row,
+          distinct_eku_id: distinct.eku_id,
+        }));
+
+      return { id: visualizationID, rowData };
+    }
+
+    return { id: visualizationID, rowData: [] };
+  }, [getVisualizationData]);
+
+  const semesterData = useMemo(() => {
+    const visualizationID = "term_desc";
+
+    const data = getVisualizationData(visualizationID);
+
+    if (data) {
+      const groupedData = groupBy(
+        data,
+        [visualizationID, "eku_id"],
+        ["student_amount"],
+        ["TERM_CODE"]
+      );
+
+      const rowData = groupedData.array
+        .filter(({ level }) => level === visualizationID)
+        .map(({ distinct, row }) => ({
+          ...row,
+          distinct_eku_id: distinct.eku_id,
+        }))
+        .sort(({ TERM_CODE: a }, { TERM_CODE: b }) => Number(a) - Number(b));
+
+      return { id: visualizationID, rowData };
+    }
+
+    return { id: visualizationID, rowData: [] };
+  }, [getVisualizationData]);
+
+  // on click pie cell, set filter by to student_waiver_type === pie cell value
+  // pie chart id: student_waiver_type
+
+  // on click bar cell, set filter by to term_desc === bar cell value (y axis)
+  // bar chart id: term_desc
+
+  // on click student table row, set filter by to eku_id === eku_id of row
+  // student table id: eku_id
+
+  // on click program table row, set filter by to program_desc === program_desc of row
+  // program table id: program_desc
+
+  // using filterBy, get filteredData
+
+  // of each visualization data, if filterBy.key === visualization id, visualization data remains based on originalData
+  // if filterBy.key !== visualization id, visualization data becomes based on filteredData instead
+
+  const rows = useMemo(() => validateArray(originalData), [originalData]);
 
   const { groupRows, tree } = useMemo(
     () =>
@@ -71,26 +388,6 @@ export default function App() {
       ),
     [rows]
   );
-
-  // console.log(groupRows);
-
-  const getTermCode = (termDesc) => {
-    let semester = termDesc.split(" ")[0].toLowerCase();
-
-    if (semester === "fall") {
-      semester = 3;
-    }
-
-    if (semester === "summer") {
-      semester = 2;
-    }
-
-    if (semester === "spring") {
-      semester = 1;
-    }
-
-    return Number(termDesc.split(" ")[1] + semester);
-  };
 
   const barChartData = Object.values(
     groupRowsByColumns(
@@ -106,8 +403,6 @@ export default function App() {
     .sort(
       ({ term_desc: a }, { term_desc: b }) => getTermCode(a) - getTermCode(b)
     );
-
-  console.log(barChartData);
 
   const studentIndexedRows = useMemo(() => {
     const beforeGrouping = groupRows.map((row) => ({
@@ -292,13 +587,6 @@ export default function App() {
     ({ eku_id }) => !gridTwoIDsSubset || gridTwoIDsSubset.has(eku_id)
   );
 
-  // console.log(
-  //   groupRowsByColumns(
-  //     somePieCellIsClicked ? gridTwoRowData : filteredGridTwoRowData,
-  //     ["student_waiver_type"]
-  //   )
-  // );
-
   const pieChartData = Object.entries(
     groupRowsByColumns(
       somePieCellIsClicked ? gridTwoRowData : filteredGridTwoRowData,
@@ -387,7 +675,7 @@ export default function App() {
                   {pieChartData.map(({ name }, index) => (
                     <Cell
                       fillOpacity={getPieCellFillOpacity(name)}
-                      fill={COLORS[index % COLORS.length]}
+                      fill={colors[index % colors.length]}
                       key={`cell-${index}`}
                       cursor="pointer"
                     />
@@ -424,32 +712,3 @@ export default function App() {
     </MainContainer>
   );
 }
-
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
-
-const RADIAN = Math.PI / 180;
-
-const renderCustomizedLabel = ({
-  innerRadius,
-  outerRadius,
-  midAngle,
-  percent,
-  cx,
-  cy,
-}) => {
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-  return (
-    <text
-      textAnchor={x > cx ? "start" : "end"}
-      dominantBaseline="central"
-      fill="white"
-      x={x}
-      y={y}
-    >
-      {`${(percent * 100).toFixed(0)}%`}
-    </text>
-  );
-};
