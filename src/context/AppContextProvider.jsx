@@ -111,8 +111,8 @@ const formatNumber2DecimalPlaces = ({ value }) =>
   });
 
 const headerNames = {
-  distinct_eku_id: "Distinct Students",
   distinct_term_desc: "Enrolled",
+  distinct_eku_id: "Students",
   student_waiver_type: "Type",
   student_amount: "Waiver $",
   first_name: "First Name",
@@ -121,6 +121,14 @@ const headerNames = {
   last_name: "Last Name",
   eku_id: "EKU ID",
 };
+
+const defaultSort = {
+  student_amount: "desc",
+  distinct_eku_id: "asc",
+};
+
+const getDefaultSort = (field) =>
+  field in defaultSort ? defaultSort[field] : null;
 
 const valueFormatters = {
   distinct_term_desc: formatNumberWithCommas,
@@ -168,6 +176,7 @@ const getColumnDefs = (rowData) =>
     ? Object.keys(rowData[0]).map((field) => ({
         valueFormatter: getValueFormatter(field),
         headerName: getHeaderName(field),
+        sort: getDefaultSort(field),
         field,
       }))
     : [];
@@ -215,7 +224,7 @@ const visualizationIDs = {
 };
 
 const getPieCellColor = (entry) => {
-  const colors = { Dependent: "#861F41", Employee: "#E6A65D" };
+  const colors = { Dependent: "#861F41", Employee: "#DC5829" };
 
   const id = visualizationIDs.waiverType;
 
@@ -229,8 +238,6 @@ const getPieCellName = (entry) => {
 };
 
 export const AppContextProvider = ({ children }) => {
-  // load bar chart
-  // need an isActive for each visualization
   // need scrollPosition to un-reset when clicking a selection on a grid
   // need the ability to filter by many options on grid again
   // term dropdown filter
@@ -241,6 +248,32 @@ export const AppContextProvider = ({ children }) => {
   const studentGridRef = useRef();
 
   const [filterBy, setFilterBy] = useState();
+
+  const handleActiveBarCell = useCallback(
+    (entry) => {
+      const id = visualizationIDs.semester;
+
+      if (filterBy && filterBy.key === id && filterBy.value !== entry[id]) {
+        return { fillOpacity: 0.5 };
+      }
+
+      return { fillOpacity: 1 };
+    },
+    [filterBy]
+  );
+
+  const handleActivePieCell = useCallback(
+    (entry) => {
+      const id = visualizationIDs.waiverType;
+
+      if (filterBy && filterBy.key === id && filterBy.value !== entry[id]) {
+        return { fillOpacity: 0.5 };
+      }
+
+      return { fillOpacity: 1 };
+    },
+    [filterBy]
+  );
 
   const updateFilterBy = (nextState) =>
     setFilterBy((state) =>
@@ -261,8 +294,38 @@ export const AppContextProvider = ({ children }) => {
     updateFilterBy(nextFilterBy);
   }, []);
 
+  const handleActiveRowClass = useCallback(
+    (e) => {
+      let id;
+
+      if (e.api === programGridRef.current.api) id = visualizationIDs.program;
+
+      if (e.api === studentGridRef.current.api) id = visualizationIDs.student;
+
+      if (
+        filterBy &&
+        filterBy.key === id &&
+        filterBy.value !== e.data[id] &&
+        !e.node.rowPinned
+      ) {
+        return "opacity-50";
+      }
+
+      return "opacity-100";
+    },
+    [filterBy]
+  );
+
   const onPieClicked = useCallback((e) => {
     const id = visualizationIDs.waiverType;
+
+    const nextFilterBy = { value: e[id], key: id };
+
+    updateFilterBy(nextFilterBy);
+  }, []);
+
+  const onBarClicked = useCallback((e) => {
+    const id = visualizationIDs.semester;
 
     const nextFilterBy = { value: e[id], key: id };
 
@@ -293,6 +356,7 @@ export const AppContextProvider = ({ children }) => {
     const data = getVisualizationData(visualizationID);
 
     const defaultReturn = {
+      getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
       ref: programGridRef,
       columnDefs: [],
@@ -309,7 +373,7 @@ export const AppContextProvider = ({ children }) => {
     }
 
     return defaultReturn;
-  }, [getVisualizationData, onRowClicked]);
+  }, [getVisualizationData, onRowClicked, handleActiveRowClass]);
 
   const studentData = useMemo(() => {
     const visualizationID = visualizationIDs.student;
@@ -317,6 +381,7 @@ export const AppContextProvider = ({ children }) => {
     const data = getVisualizationData(visualizationID);
 
     const defaultReturn = {
+      getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
       ref: studentGridRef,
       columnDefs: [],
@@ -338,7 +403,7 @@ export const AppContextProvider = ({ children }) => {
     }
 
     return defaultReturn;
-  }, [getVisualizationData, onRowClicked]);
+  }, [getVisualizationData, onRowClicked, handleActiveRowClass]);
 
   const waiverTypeData = useMemo(() => {
     const visualizationID = visualizationIDs.waiverType;
@@ -346,11 +411,12 @@ export const AppContextProvider = ({ children }) => {
     const data = getVisualizationData(visualizationID);
 
     const defaultReturn = {
+      handleActiveCell: handleActivePieCell,
       getCellColor: getPieCellColor,
       getCellName: getPieCellName,
       dataKey: "distinct_eku_id",
-      label: "Distinct Students",
       onClick: onPieClicked,
+      label: "Students",
       data: [],
     };
 
@@ -363,25 +429,39 @@ export const AppContextProvider = ({ children }) => {
     }
 
     return defaultReturn;
-  }, [getVisualizationData, onPieClicked]);
+  }, [getVisualizationData, onPieClicked, handleActivePieCell]);
 
   const semesterData = useMemo(() => {
     const visualizationID = visualizationIDs.semester;
 
     const data = getVisualizationData(visualizationID);
 
+    const formatTicks = (value) => formatNumberWithCommas({ value });
+
+    const formatDataKeys = (value) => {
+      if (value === "distinct_eku_id") {
+        return "Students";
+      }
+
+      if (value === "student_amount") {
+        return "Waiver $";
+      }
+    };
+
     const defaultReturn = {
-      lineProps: {
-        dataKey: "distinct_eku_id",
-        label: "Students",
-        color: "#009681",
-      },
       barProps: {
         dataKey: "student_amount",
-        label: "Waiver $",
-        color: "#DC5829",
+        onClick: onBarClicked,
+        color: "#E6A65D",
+      },
+      lineProps: {
+        dataKey: "distinct_eku_id",
+        color: "#009681",
       },
       xAxisProps: { dataKey: visualizationID },
+      handleActiveCell: handleActiveBarCell,
+      formatDataKeys,
+      formatTicks,
       data: [],
     };
 
@@ -401,7 +481,7 @@ export const AppContextProvider = ({ children }) => {
     }
 
     return defaultReturn;
-  }, [getVisualizationData]);
+  }, [getVisualizationData, onBarClicked, handleActiveBarCell]);
 
   const context = { waiverTypeData, semesterData, studentData, programData };
 

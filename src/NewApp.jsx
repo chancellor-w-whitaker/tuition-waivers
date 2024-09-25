@@ -8,7 +8,6 @@ import {
   Legend,
   XAxis,
   YAxis,
-  Label,
   Cell,
   Line,
   Pie,
@@ -25,6 +24,7 @@ const renderActiveShape = (props) => {
     innerRadius,
     outerRadius,
     getCellName,
+    fillOpacity,
     startAngle,
     midAngle,
     endAngle,
@@ -54,6 +54,7 @@ const renderActiveShape = (props) => {
       <Sector
         innerRadius={innerRadius}
         outerRadius={outerRadius}
+        fillOpacity={fillOpacity}
         startAngle={startAngle}
         endAngle={endAngle}
         fill={fill}
@@ -63,6 +64,7 @@ const renderActiveShape = (props) => {
       <Sector
         outerRadius={outerRadius + 10}
         innerRadius={outerRadius + 6}
+        fillOpacity={fillOpacity}
         startAngle={startAngle}
         endAngle={endAngle}
         fill={fill}
@@ -71,16 +73,24 @@ const renderActiveShape = (props) => {
       />
       <path
         d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`}
+        strokeOpacity={fillOpacity}
         stroke={fill}
         fill="none"
       />
-      <circle stroke="none" fill={fill} cx={ex} cy={ey} r={2} />
+      <circle
+        fillOpacity={fillOpacity}
+        stroke="none"
+        fill={fill}
+        cx={ex}
+        cy={ey}
+        r={2}
+      />
       <text
         x={ex + (cos >= 0 ? 1 : -1) * 12}
         textAnchor={textAnchor}
         fill="#333"
         y={ey}
-      >{`${label} ${value}`}</text>
+      >{`${label} : ${value}`}</text>
       <text
         x={ex + (cos >= 0 ? 1 : -1) * 12}
         textAnchor={textAnchor}
@@ -95,6 +105,7 @@ const renderActiveShape = (props) => {
 };
 
 const ActiveShapePieChart = ({
+  handleActiveCell,
   getCellColor,
   getCellName,
   dataKey,
@@ -102,18 +113,30 @@ const ActiveShapePieChart = ({
   label,
   data,
 }) => {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeCellName, setActiveCellName] = useState();
 
-  const onPieEnter = (entry, index) => setActiveIndex(index);
+  const [previousData, setPreviousData] = useState(data);
+
+  if (previousData !== data) {
+    setPreviousData(data);
+
+    if (previousData.length === 0 && data.length > 0) {
+      setActiveCellName(getCellName(data[0]));
+    }
+  }
+
+  const onPieEnter = (entry) => setActiveCellName(getCellName(entry));
 
   return (
     <ResponsiveContainer height={500}>
       <PieChart>
         <Pie
+          activeIndex={data.findIndex(
+            (entry) => getCellName(entry) === activeCellName
+          )}
           activeShape={(props) =>
             renderActiveShape({ ...props, getCellName, label })
           }
-          activeIndex={activeIndex}
           onMouseEnter={onPieEnter}
           onClick={onClick}
           dataKey={dataKey}
@@ -125,7 +148,11 @@ const ActiveShapePieChart = ({
           cy="50%"
         >
           {data.map((entry, index) => (
-            <Cell fill={getCellColor(entry)} key={`cell-${index}`} />
+            <Cell
+              {...handleActiveCell(entry)}
+              fill={getCellColor(entry)}
+              key={`cell-${index}`}
+            />
           ))}
         </Pie>
       </PieChart>
@@ -133,17 +160,49 @@ const ActiveShapePieChart = ({
   );
 };
 
-const BiaxialBarChart = ({ xAxisProps, lineProps, barProps, data }) => {
+const BiaxialBarChart = ({
+  handleActiveCell,
+  formatDataKeys,
+  formatTicks,
+  xAxisProps,
+  lineProps,
+  barProps,
+  data,
+}) => {
   return (
     <ResponsiveContainer height={500}>
       <ComposedChart data={data}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey={xAxisProps.dataKey} />
-        <YAxis stroke={barProps.color} orientation="left" yAxisId="left" />
-        <YAxis stroke={lineProps.color} orientation="right" yAxisId="right" />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey={barProps.dataKey} fill={barProps.color} yAxisId="left" />
+        <YAxis
+          tickFormatter={formatTicks}
+          stroke={barProps.color}
+          orientation="left"
+          yAxisId="left"
+        />
+        <YAxis
+          tickFormatter={formatTicks}
+          stroke={lineProps.color}
+          orientation="right"
+          yAxisId="right"
+        />
+        <Tooltip
+          formatter={(value, name) => [
+            formatTicks(value),
+            formatDataKeys(name),
+          ]}
+        />
+        <Legend formatter={formatDataKeys} />
+        <Bar
+          onClick={barProps.onClick}
+          dataKey={barProps.dataKey}
+          fill={barProps.color}
+          yAxisId="left"
+        >
+          {data.map((entry, index) => (
+            <Cell {...handleActiveCell(entry)} key={`cell-${index}`} />
+          ))}
+        </Bar>
         <Line
           dataKey={lineProps.dataKey}
           stroke={lineProps.color}
