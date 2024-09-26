@@ -98,14 +98,12 @@ export const ActiveShapePieChart = ({
 }) => {
   const [activeCellName, setActiveCellName] = useState();
 
-  const [previousData, setPreviousData] = useState(data);
+  const activeIndex = data.findIndex(
+    (entry) => getCellName(entry) === activeCellName
+  );
 
-  if (previousData !== data) {
-    // if activeCellName goes missing, pick a different one
-
-    setPreviousData(data);
-
-    if (previousData.length === 0 && data.length > 0) {
+  if (activeIndex === -1) {
+    if (data.length > 0) {
       setActiveCellName(getCellName(data[0]));
     }
   }
@@ -116,12 +114,10 @@ export const ActiveShapePieChart = ({
     <ResponsiveContainer height={500}>
       <PieChart>
         <Pie
-          activeIndex={data.findIndex(
-            (entry) => getCellName(entry) === activeCellName
-          )}
           activeShape={(props) =>
             renderActiveShape({ ...props, getCellName, label })
           }
+          activeIndex={activeIndex}
           onMouseEnter={onPieEnter}
           onClick={onClick}
           dataKey={dataKey}

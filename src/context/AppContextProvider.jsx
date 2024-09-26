@@ -41,7 +41,7 @@ import { groupBy } from "./helpers/groupBy";
 
 export const AppContextProvider = ({ children }) => {
   // need scrollPosition to un-reset when clicking a selection on a grid
-  // need the ability to filter by many options on grid again
+  // * need the ability to filter by many options on grid again
   // term dropdown filter
   // * bar y axis labels
   // other ease-of-use & style changes
@@ -90,13 +90,6 @@ export const AppContextProvider = ({ children }) => {
     [isCellIrrelevant]
   );
 
-  const updateActiveValues = (nextState) =>
-    setActiveValues((state) =>
-      state && state.value === nextState.value && state.key === nextState.key
-        ? null
-        : nextState
-    );
-
   const updateActiveRow = (nextActiveValue) =>
     setActiveValues((state) => {
       if (state.some(({ key }) => key === nextActiveValue.key)) {
@@ -108,7 +101,7 @@ export const AppContextProvider = ({ children }) => {
         ) {
           return state.filter(
             ({ value, key }) =>
-              key !== nextActiveValue.key && value !== nextActiveValue.value
+              !(key === nextActiveValue.key && value === nextActiveValue.value)
           );
         } else {
           return [...state, nextActiveValue];
@@ -127,8 +120,26 @@ export const AppContextProvider = ({ children }) => {
 
     const nextActiveValue = { value: e.data[id], key: id };
 
-    updateActiveRow(nextActiveValue);
+    !e.node.rowPinned && updateActiveRow(nextActiveValue);
   }, []);
+
+  const onRowDataUpdated = useCallback(
+    (e) => {
+      let id;
+
+      if (e.api === programGridRef.current.api) id = visualizationIDs.program;
+
+      if (e.api === studentGridRef.current.api) id = visualizationIDs.student;
+
+      if (activeValues.some(({ key }) => key === id)) {
+        e.api.ensureNodeVisible(
+          (node) =>
+            node.data[id] === activeValues[activeValues.length - 1].value
+        );
+      }
+    },
+    [activeValues]
+  );
 
   const handleActiveRowClass = useCallback(
     (e) => {
@@ -202,6 +213,7 @@ export const AppContextProvider = ({ children }) => {
       getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
       ref: programGridRef,
+      onRowDataUpdated,
       columnDefs: [],
       onRowClicked,
       rowData: [],
@@ -216,7 +228,12 @@ export const AppContextProvider = ({ children }) => {
     }
 
     return defaultReturn;
-  }, [getVisualizationData, onRowClicked, handleActiveRowClass]);
+  }, [
+    getVisualizationData,
+    onRowClicked,
+    handleActiveRowClass,
+    onRowDataUpdated,
+  ]);
 
   const studentData = useMemo(() => {
     const visualizationID = visualizationIDs.student;
@@ -227,6 +244,7 @@ export const AppContextProvider = ({ children }) => {
       getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
       ref: studentGridRef,
+      onRowDataUpdated,
       columnDefs: [],
       onRowClicked,
       rowData: [],
@@ -242,11 +260,38 @@ export const AppContextProvider = ({ children }) => {
 
       const dataGridProps = getDataGridProps({ visualizationID, groupedData });
 
-      return { ...defaultReturn, ...dataGridProps };
+      const fieldsSorted = [
+        "eku_id",
+        "last_name",
+        "first_name",
+        "student_waiver_type",
+        "student_amount",
+        "distinct_term_desc",
+        "enrolled_hours",
+      ];
+
+      const evaluateFieldPosition = (field) =>
+        fieldsSorted.includes(field)
+          ? fieldsSorted.indexOf(field)
+          : Number.MAX_SAFE_INTEGER;
+
+      const sortColumnDefs = ({ field: fieldA }, { field: fieldB }) =>
+        evaluateFieldPosition(fieldA) - evaluateFieldPosition(fieldB);
+
+      return {
+        ...defaultReturn,
+        ...dataGridProps,
+        columnDefs: dataGridProps.columnDefs.sort(sortColumnDefs),
+      };
     }
 
     return defaultReturn;
-  }, [getVisualizationData, onRowClicked, handleActiveRowClass]);
+  }, [
+    getVisualizationData,
+    onRowClicked,
+    handleActiveRowClass,
+    onRowDataUpdated,
+  ]);
 
   const waiverTypeData = useMemo(() => {
     const visualizationID = visualizationIDs.waiverType;
