@@ -4,13 +4,16 @@ import { createRoot } from "react-dom/client";
 import { StrictMode } from "react";
 
 import { AppContextProvider } from "./context/AppContextProvider.jsx";
+import { Wrapper } from "./components/Wrapper.jsx";
 import App from "./App.jsx";
 import "./index.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <AppContextProvider>
-      <App />
+      <Wrapper>
+        <App />
+      </Wrapper>
     </AppContextProvider>
   </StrictMode>
 );

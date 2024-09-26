@@ -41,6 +41,8 @@ import { groupBy } from "./helpers/groupBy";
 
 const onFirstDataRendered = ({ api }) => api.sizeColumnsToFit();
 
+// const onGridSizeChanged = onFirstDataRendered;
+
 export const AppContextProvider = ({ children }) => {
   // need scrollPosition to un-reset when clicking a selection on a grid
   // * need the ability to filter by many options on grid again
