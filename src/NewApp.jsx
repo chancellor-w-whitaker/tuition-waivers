@@ -165,32 +165,52 @@ const ActiveShapePieChart = ({
 const BiaxialBarChart = ({
   handleActiveCell,
   formatDataKeys,
-  formatTicks,
+  valueFormatter,
   xAxisProps,
   lineProps,
   barProps,
   data,
 }) => {
+  const createLeftYAxisLabel = (props) => ({
+    value: formatDataKeys(props.dataKey),
+    style: { textAnchor: "middle" },
+    fill: props.color,
+    position: "left",
+    angle: -90,
+    offset: 0,
+  });
+
+  const createRightYAxisLabel = (props) => ({
+    value: formatDataKeys(props.dataKey),
+    style: { textAnchor: "middle" },
+    fill: props.color,
+    position: "right",
+    angle: -90,
+    offset: 0,
+  });
+
   return (
     <ResponsiveContainer height={500}>
       <ComposedChart data={data}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey={xAxisProps.dataKey} />
         <YAxis
-          tickFormatter={formatTicks}
+          label={createLeftYAxisLabel(barProps)}
+          tickFormatter={barProps.tickFormatter}
           stroke={barProps.color}
           orientation="left"
           yAxisId="left"
         />
         <YAxis
-          tickFormatter={formatTicks}
+          label={createRightYAxisLabel(lineProps)}
+          tickFormatter={lineProps.tickFormatter}
           stroke={lineProps.color}
           orientation="right"
           yAxisId="right"
         />
         <Tooltip
           formatter={(value, name) => [
-            formatTicks(value),
+            valueFormatter(value),
             formatDataKeys(name),
           ]}
         />

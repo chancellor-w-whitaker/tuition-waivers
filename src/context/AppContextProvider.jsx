@@ -237,11 +237,18 @@ const getPieCellName = (entry) => {
   return entry[id];
 };
 
+const lesserFillOpacityValue = 0.25;
+
+function formatCompactNumber(number) {
+  const formatter = Intl.NumberFormat("en", { notation: "compact" });
+  return formatter.format(number);
+}
+
 export const AppContextProvider = ({ children }) => {
   // need scrollPosition to un-reset when clicking a selection on a grid
   // need the ability to filter by many options on grid again
   // term dropdown filter
-  // bar y axis labels
+  // * bar y axis labels
   // other ease-of-use & style changes
   // consider stacking filters with ctrl button like in power-bi
 
@@ -256,7 +263,7 @@ export const AppContextProvider = ({ children }) => {
       const id = visualizationIDs.semester;
 
       if (filterBy && filterBy.key === id && filterBy.value !== entry[id]) {
-        return { fillOpacity: 0.5 };
+        return { fillOpacity: lesserFillOpacityValue };
       }
 
       return { fillOpacity: 1 };
@@ -269,7 +276,7 @@ export const AppContextProvider = ({ children }) => {
       const id = visualizationIDs.waiverType;
 
       if (filterBy && filterBy.key === id && filterBy.value !== entry[id]) {
-        return { fillOpacity: 0.5 };
+        return { fillOpacity: lesserFillOpacityValue };
       }
 
       return { fillOpacity: 1 };
@@ -310,7 +317,7 @@ export const AppContextProvider = ({ children }) => {
         filterBy.value !== e.data[id] &&
         !e.node.rowPinned
       ) {
-        return "opacity-50";
+        return "opacity-25";
       }
 
       return "opacity-100";
@@ -438,8 +445,6 @@ export const AppContextProvider = ({ children }) => {
 
     const data = getVisualizationData(visualizationID);
 
-    const formatTicks = (value) => formatNumberWithCommas({ value });
-
     const formatDataKeys = (value) => {
       if (value === "distinct_eku_id") {
         return "Students";
@@ -450,20 +455,24 @@ export const AppContextProvider = ({ children }) => {
       }
     };
 
+    const valueFormatter = (value) => formatNumberWithCommas({ value });
+
     const defaultReturn = {
       barProps: {
+        tickFormatter: formatCompactNumber,
         dataKey: "student_amount",
         onClick: onBarClicked,
         color: "#E6A65D",
       },
       lineProps: {
+        tickFormatter: valueFormatter,
         dataKey: "distinct_eku_id",
         color: "#009681",
       },
       xAxisProps: { dataKey: visualizationID },
       handleActiveCell: handleActiveBarCell,
+      valueFormatter,
       formatDataKeys,
-      formatTicks,
       data: [],
     };
 
