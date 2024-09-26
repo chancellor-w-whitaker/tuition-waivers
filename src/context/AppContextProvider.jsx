@@ -39,6 +39,8 @@ import { groupBy } from "./helpers/groupBy";
 //   },
 // };
 
+const onFirstDataRendered = ({ api }) => api.sizeColumnsToFit();
+
 export const AppContextProvider = ({ children }) => {
   // need scrollPosition to un-reset when clicking a selection on a grid
   // * need the ability to filter by many options on grid again
@@ -213,6 +215,7 @@ export const AppContextProvider = ({ children }) => {
       getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
       ref: programGridRef,
+      onFirstDataRendered,
       onRowDataUpdated,
       columnDefs: [],
       onRowClicked,
@@ -244,6 +247,7 @@ export const AppContextProvider = ({ children }) => {
       getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
       ref: studentGridRef,
+      onFirstDataRendered,
       onRowDataUpdated,
       columnDefs: [],
       onRowClicked,
