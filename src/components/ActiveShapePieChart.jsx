@@ -1,22 +1,5 @@
-import {
-  ResponsiveContainer,
-  CartesianGrid,
-  ComposedChart,
-  PieChart,
-  Tooltip,
-  Sector,
-  Legend,
-  XAxis,
-  YAxis,
-  Cell,
-  Line,
-  Pie,
-  Bar,
-} from "recharts";
-import { AgGridReact } from "ag-grid-react";
+import { ResponsiveContainer, PieChart, Sector, Cell, Pie } from "recharts";
 import { useState } from "react";
-
-import { useAppContext } from "./context/useAppContext";
 
 const renderActiveShape = (props) => {
   const RADIAN = Math.PI / 180;
@@ -104,7 +87,7 @@ const renderActiveShape = (props) => {
   );
 };
 
-const ActiveShapePieChart = ({
+export const ActiveShapePieChart = ({
   handleActiveCell,
   getCellColor,
   getCellName,
@@ -161,114 +144,3 @@ const ActiveShapePieChart = ({
     </ResponsiveContainer>
   );
 };
-
-const BiaxialBarChart = ({
-  handleActiveCell,
-  formatDataKeys,
-  valueFormatter,
-  xAxisProps,
-  lineProps,
-  barProps,
-  data,
-}) => {
-  const createLeftYAxisLabel = (props) => ({
-    value: formatDataKeys(props.dataKey),
-    style: { textAnchor: "middle" },
-    fill: props.color,
-    position: "left",
-    angle: -90,
-    offset: 0,
-  });
-
-  const createRightYAxisLabel = (props) => ({
-    value: formatDataKeys(props.dataKey),
-    style: { textAnchor: "middle" },
-    fill: props.color,
-    position: "right",
-    angle: -90,
-    offset: 0,
-  });
-
-  return (
-    <ResponsiveContainer height={500}>
-      <ComposedChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey={xAxisProps.dataKey} />
-        <YAxis
-          label={createLeftYAxisLabel(barProps)}
-          tickFormatter={barProps.tickFormatter}
-          stroke={barProps.color}
-          orientation="left"
-          yAxisId="left"
-        />
-        <YAxis
-          label={createRightYAxisLabel(lineProps)}
-          tickFormatter={lineProps.tickFormatter}
-          stroke={lineProps.color}
-          orientation="right"
-          yAxisId="right"
-        />
-        <Tooltip
-          formatter={(value, name) => [
-            valueFormatter(value),
-            formatDataKeys(name),
-          ]}
-        />
-        <Legend formatter={formatDataKeys} />
-        <Bar
-          onClick={barProps.onClick}
-          dataKey={barProps.dataKey}
-          fill={barProps.color}
-          yAxisId="left"
-        >
-          {data.map((entry, index) => (
-            <Cell {...handleActiveCell(entry)} key={`cell-${index}`} />
-          ))}
-        </Bar>
-        <Line
-          dataKey={lineProps.dataKey}
-          stroke={lineProps.color}
-          fill={lineProps.color}
-          yAxisId="right"
-          strokeWidth={2}
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
-  );
-};
-
-const CSSGrid = ({ children }) => {
-  return (
-    <div className="bd-example m-0 border-0 bd-example-cssgrid">
-      <div className="grid">
-        {children.map((child, index) => (
-          <div className="g-col-6" key={index}>
-            {child}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-export default function NewApp() {
-  const { waiverTypeData, semesterData, programData, studentData } =
-    useAppContext();
-
-  return (
-    <main className="container">
-      <div className="my-3 p-3 bg-body rounded shadow-sm">
-        <CSSGrid>
-          <div className="ag-theme-balham" style={{ height: 500 }}>
-            <AgGridReact {...programData} />
-          </div>
-          <div className="ag-theme-balham" style={{ height: 500 }}>
-            <AgGridReact {...studentData} />
-          </div>
-          <ActiveShapePieChart {...waiverTypeData}></ActiveShapePieChart>
-          <BiaxialBarChart {...semesterData}></BiaxialBarChart>
-        </CSSGrid>
-      </div>
-    </main>
-  );
-}

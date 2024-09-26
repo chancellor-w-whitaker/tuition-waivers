@@ -1,149 +1,17 @@
 import { useCallback, useState, useMemo, useRef } from "react";
-import { csv } from "d3-fetch";
 
+import { lesserFillOpacityValue } from "./constants/lesserFillOpacityValue";
+import { formatNumberWithCommas } from "./helpers/formatNumberWithCommas";
+import { formatCompactNumber } from "./helpers/formatCompactNumber";
+import { visualizationIDs } from "./constants/visualizationIDs";
+import { getDataGridProps } from "./helpers/getDataGridProps";
+import { getPieCellColor } from "./helpers/getPieCellColor";
+import { getPieCellName } from "./helpers/getPieCellName";
+import { dataPromise } from "./constants/dataPromise";
+import { getRowData } from "./helpers/getRowData";
 import { usePromise } from "../hooks/usePromise";
-import { AppContext } from "./AppContext";
-
-const groupBy = (
-  rows = [],
-  groupByColumns = [],
-  sumUpColumns = [],
-  supplementalColumns = []
-) => {
-  const isStringNumeric = (param) => {
-    const method1 = (string) => !Number.isNaN(string);
-
-    const method2 = (string) => /^[+-]?\d+(\.\d+)?$/.test(string);
-
-    const method3 = (string) => !Number.isNaN(Number(string));
-
-    const method4 = (string) => Number.isFinite(+string);
-
-    const method5 = (string) => string == Number.parseFloat(string);
-
-    const methods = [method1, method2, method3, method4, method5];
-
-    return !methods.some((method) => !method(param));
-  };
-
-  const getNumberEntries = (row) =>
-    sumUpColumns
-      .map((column) => [column, row[column]])
-      .filter(([key, value]) => isStringNumeric(value));
-
-  const getSupplementalValues = (row) =>
-    Object.fromEntries(
-      supplementalColumns.map((column) => [column, row[column]])
-    );
-
-  const zeroedSums = Object.fromEntries(
-    sumUpColumns.map((column) => [column, 0])
-  );
-
-  const groupedRows = [];
-
-  const tree = { parent: { ...zeroedSums }, distinct: {}, children: {} };
-
-  groupedRows.push({ distinct: tree.distinct, row: tree.parent });
-
-  rows.forEach((row) => {
-    const numberEntries = getNumberEntries(row);
-
-    let node = tree;
-
-    numberEntries.forEach(
-      ([column, number]) => (node.parent[column] += Number(number))
-    );
-
-    let pairs = {};
-
-    let ancestorCounters = [];
-
-    groupByColumns.forEach((column) => {
-      const value = row[column];
-
-      pairs[column] = value;
-
-      ancestorCounters.push(node.distinct);
-
-      if (!(value in node.children)) {
-        node.children[value] = {
-          parent: { ...pairs, ...zeroedSums, ...getSupplementalValues(row) },
-          level: column,
-          distinct: {},
-          children: {},
-        };
-
-        const { distinct, parent, level } = node.children[value];
-
-        groupedRows.push({
-          row: parent,
-          distinct,
-          level,
-        });
-
-        ancestorCounters.forEach((object) => {
-          if (!(column in object)) {
-            object[column] = 0;
-          }
-
-          object[column]++;
-        });
-      }
-
-      node = node.children[value];
-
-      numberEntries.forEach(
-        ([column, number]) => (node.parent[column] += Number(number))
-      );
-    });
-  });
-
-  return { array: groupedRows, tree };
-};
-
-const formatNumberWithCommas = ({ value }) => value.toLocaleString();
-
-const formatNumber2DecimalPlaces = ({ value }) =>
-  value.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-const headerNames = {
-  distinct_term_desc: "Enrolled",
-  distinct_eku_id: "Students",
-  student_waiver_type: "Type",
-  student_amount: "Waiver $",
-  first_name: "First Name",
-  program_desc: "Program",
-  enrolled_hours: "Hours",
-  last_name: "Last Name",
-  eku_id: "EKU ID",
-};
-
-const defaultSort = {
-  student_amount: "desc",
-  distinct_eku_id: "asc",
-};
-
-const getDefaultSort = (field) =>
-  field in defaultSort ? defaultSort[field] : null;
-
-const valueFormatters = {
-  distinct_term_desc: formatNumberWithCommas,
-  student_amount: formatNumber2DecimalPlaces,
-  enrolled_hours: formatNumber2DecimalPlaces,
-  distinct_eku_id: formatNumberWithCommas,
-};
-
-const defaultValueFormatter = ({ value }) => value;
-
-const getValueFormatter = (field) =>
-  field in valueFormatters ? valueFormatters[field] : defaultValueFormatter;
-
-const getHeaderName = (field) =>
-  field in headerNames ? headerNames[field] : field;
+import { AppContext } from "./utils/AppContext";
+import { groupBy } from "./helpers/groupBy";
 
 // const chartProperties = {
 //   barChart: {
@@ -171,79 +39,6 @@ const getHeaderName = (field) =>
 //   },
 // };
 
-const getColumnDefs = (rowData) =>
-  rowData.length > 0
-    ? Object.keys(rowData[0]).map((field) => ({
-        valueFormatter: getValueFormatter(field),
-        headerName: getHeaderName(field),
-        sort: getDefaultSort(field),
-        field,
-      }))
-    : [];
-
-const dataPromise = csv("data/data.csv");
-
-const distinguishDistinctKeys = (object) =>
-  Object.fromEntries(
-    Object.entries(object).map(([key, value]) => [`distinct_${key}`, value])
-  );
-
-const getRowData = ({ visualizationID, groupedData }) =>
-  groupedData.array
-    .filter(({ level }) => level === visualizationID)
-    .map(({ distinct, row }) => ({
-      ...row,
-      ...distinguishDistinctKeys(distinct),
-    }));
-
-const getPinnedBottomRowData = ({ visualizationID, groupedData }) =>
-  [groupedData.array[0]].map(({ distinct, row }) => ({
-    ...row,
-    ...distinguishDistinctKeys(distinct),
-    [visualizationID]: "Total",
-  }));
-
-const getDataGridProps = ({ visualizationID, groupedData }) => {
-  const rowData = getRowData({ visualizationID, groupedData });
-
-  const pinnedBottomRowData = getPinnedBottomRowData({
-    visualizationID,
-    groupedData,
-  });
-
-  const columnDefs = getColumnDefs(rowData);
-
-  return { pinnedBottomRowData, columnDefs, rowData };
-};
-
-const visualizationIDs = {
-  waiverType: "student_waiver_type",
-  program: "program_desc",
-  semester: "term_desc",
-  student: "eku_id",
-};
-
-const getPieCellColor = (entry) => {
-  const colors = { Dependent: "#861F41", Employee: "#DC5829" };
-
-  const id = visualizationIDs.waiverType;
-
-  return colors[entry[id]];
-};
-
-const getPieCellName = (entry) => {
-  const id = visualizationIDs.waiverType;
-
-  return entry[id];
-};
-
-const lesserFillOpacityValue = 0.25;
-
-function formatCompactNumber(number) {
-  const formatter = Intl.NumberFormat("en", { notation: "compact" });
-  return formatter.format(number);
-}
-
 export const AppContextProvider = ({ children }) => {
   // need scrollPosition to un-reset when clicking a selection on a grid
   // need the ability to filter by many options on grid again
@@ -256,40 +51,72 @@ export const AppContextProvider = ({ children }) => {
 
   const studentGridRef = useRef();
 
-  const [filterBy, setFilterBy] = useState();
+  const [activeValues, setActiveValues] = useState([]);
+
+  const isCellIrrelevant = useCallback(
+    ({ entry, id }) => {
+      if (activeValues.some(({ key }) => key === id)) {
+        return !activeValues.some(
+          ({ value, key }) => key === id && value === entry[id]
+        );
+      }
+    },
+    [activeValues]
+  );
 
   const handleActiveBarCell = useCallback(
     (entry) => {
       const id = visualizationIDs.semester;
 
-      if (filterBy && filterBy.key === id && filterBy.value !== entry[id]) {
+      if (isCellIrrelevant({ entry, id })) {
         return { fillOpacity: lesserFillOpacityValue };
       }
 
       return { fillOpacity: 1 };
     },
-    [filterBy]
+    [isCellIrrelevant]
   );
 
   const handleActivePieCell = useCallback(
     (entry) => {
       const id = visualizationIDs.waiverType;
 
-      if (filterBy && filterBy.key === id && filterBy.value !== entry[id]) {
+      if (isCellIrrelevant({ entry, id })) {
         return { fillOpacity: lesserFillOpacityValue };
       }
 
       return { fillOpacity: 1 };
     },
-    [filterBy]
+    [isCellIrrelevant]
   );
 
-  const updateFilterBy = (nextState) =>
-    setFilterBy((state) =>
+  const updateActiveValues = (nextState) =>
+    setActiveValues((state) =>
       state && state.value === nextState.value && state.key === nextState.key
         ? null
         : nextState
     );
+
+  const updateActiveRow = (nextActiveValue) =>
+    setActiveValues((state) => {
+      if (state.some(({ key }) => key === nextActiveValue.key)) {
+        if (
+          state.some(
+            ({ value, key }) =>
+              key === nextActiveValue.key && value === nextActiveValue.value
+          )
+        ) {
+          return state.filter(
+            ({ value, key }) =>
+              key !== nextActiveValue.key && value !== nextActiveValue.value
+          );
+        } else {
+          return [...state, nextActiveValue];
+        }
+      } else {
+        return [nextActiveValue];
+      }
+    });
 
   const onRowClicked = useCallback((e) => {
     let id;
@@ -298,9 +125,9 @@ export const AppContextProvider = ({ children }) => {
 
     if (e.api === studentGridRef.current.api) id = visualizationIDs.student;
 
-    const nextFilterBy = { value: e.data[id], key: id };
+    const nextActiveValue = { value: e.data[id], key: id };
 
-    updateFilterBy(nextFilterBy);
+    updateActiveRow(nextActiveValue);
   }, []);
 
   const handleActiveRowClass = useCallback(
@@ -311,52 +138,59 @@ export const AppContextProvider = ({ children }) => {
 
       if (e.api === studentGridRef.current.api) id = visualizationIDs.student;
 
-      if (
-        filterBy &&
-        filterBy.key === id &&
-        filterBy.value !== e.data[id] &&
-        !e.node.rowPinned
-      ) {
+      if (!e.node.rowPinned && isCellIrrelevant({ entry: e.data, id })) {
         return "opacity-25";
       }
 
       return "opacity-100";
     },
-    [filterBy]
+    [isCellIrrelevant]
   );
+
+  const updateActiveCell = (nextActiveValue) =>
+    setActiveValues((state) =>
+      state.length === 1 &&
+      state[0].value === nextActiveValue.value &&
+      state[0].key === nextActiveValue.key
+        ? []
+        : [nextActiveValue]
+    );
 
   const onPieClicked = useCallback((e) => {
     const id = visualizationIDs.waiverType;
 
-    const nextFilterBy = { value: e[id], key: id };
+    const nextActiveValue = { value: e[id], key: id };
 
-    updateFilterBy(nextFilterBy);
+    updateActiveCell(nextActiveValue);
   }, []);
 
   const onBarClicked = useCallback((e) => {
     const id = visualizationIDs.semester;
 
-    const nextFilterBy = { value: e[id], key: id };
+    const nextActiveValue = { value: e[id], key: id };
 
-    updateFilterBy(nextFilterBy);
+    updateActiveCell(nextActiveValue);
   }, []);
 
   const originalData = usePromise(dataPromise);
 
   const filteredData = useMemo(() => {
-    if (filterBy && Array.isArray(originalData)) {
-      const { value, key } = filterBy;
+    if (Array.isArray(originalData)) {
+      const filters = [activeValues].flat();
 
-      return originalData.filter((row) => row[key] === value);
+      return originalData.filter((row) => {
+        return filters.some(({ value, key }) => row[key] === value);
+      });
     }
-  }, [filterBy, originalData]);
+  }, [activeValues, originalData]);
 
   const getVisualizationData = useCallback(
     (visualizationID) =>
-      filterBy && filterBy.key !== visualizationID
-        ? filteredData
-        : originalData,
-    [filteredData, originalData, filterBy]
+      activeValues.length === 0 ||
+      activeValues.some(({ key }) => key === visualizationID)
+        ? originalData
+        : filteredData,
+    [filteredData, originalData, activeValues]
   );
 
   const programData = useMemo(() => {

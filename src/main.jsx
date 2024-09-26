@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { StrictMode } from "react";
 
 import { AppContextProvider } from "./context/AppContextProvider.jsx";
-import App from "./NewApp.jsx";
+import App from "./App.jsx";
 import "./index.css";
 
 createRoot(document.getElementById("root")).render(
