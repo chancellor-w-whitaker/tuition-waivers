@@ -13,44 +13,19 @@ import { usePromise } from "../hooks/usePromise";
 import { AppContext } from "./utils/AppContext";
 import { groupBy } from "./helpers/groupBy";
 
-// const chartProperties = {
-//   barChart: {
-//     valueFormatters: {
-//       student_amount: (value) => formatNumber2DecimalPlaces({ value }),
-//       distinct_eku_id: (value) => formatNumberWithCommas({ value }),
-//     },
-//     displayNames: {
-//       distinct_eku_id: "Students",
-//       student_amount: "Waiver $",
-//       term_desc: "Semester",
-//     },
-//     colors: { lines: "#009681", bars: "#DC5829" },
-//     title: "Waivers & Students by Semester",
-//   },
-//   pieChart: {
-//     // need to define how label & tooltip show percentage
-//     // need to define how number is formatted in tooltip (with commas)
-//     displayNames: {
-//       distinct_eku_id: "Distinct Students",
-//       student_waiver_type: "Waiver Type",
-//     },
-//     colors: { Dependent: "#861F41", Employee: "#E6A65D" },
-//     title: "Waiver Type",
-//   },
-// };
-
 const onFirstDataRendered = ({ api }) => api.sizeColumnsToFit();
 
-// const onGridSizeChanged = onFirstDataRendered;
+// add term filter
+// maybe opt to sticky active rows instead of repositioning the scroll position
+const quantifyTerm = (termDesc) => {
+  const [season, year] = termDesc.split(" ");
+
+  const seasons = ["spring", "summer", "fall"];
+
+  return Number(year + seasons.indexOf(season.toLowerCase()));
+};
 
 export const AppContextProvider = ({ children }) => {
-  // need scrollPosition to un-reset when clicking a selection on a grid
-  // * need the ability to filter by many options on grid again
-  // term dropdown filter
-  // * bar y axis labels
-  // other ease-of-use & style changes
-  // consider stacking filters with ctrl button like in power-bi
-
   const programGridRef = useRef();
 
   const studentGridRef = useRef();
@@ -187,7 +162,49 @@ export const AppContextProvider = ({ children }) => {
     updateActiveCell(nextActiveValue);
   }, []);
 
-  const originalData = usePromise(dataPromise);
+  const data = usePromise(dataPromise);
+
+  const terms = useMemo(
+    () =>
+      Array.isArray(data)
+        ? new Set(data.map(({ term_desc }) => term_desc))
+        : null,
+    [data]
+  );
+
+  const termsList =
+    terms && terms.size > 0
+      ? [...terms].sort((a, b) => quantifyTerm(a) - quantifyTerm(b))
+      : [];
+
+  const [activeTerms, setActiveTerms] = useState();
+
+  const onClickTerm = (term) =>
+    setActiveTerms((state) =>
+      state.has(term)
+        ? new Set([...state].filter((element) => element !== term))
+        : new Set([term, ...state])
+    );
+
+  const isTermItemActive = (term) => activeTerms.has(term);
+
+  if (!activeTerms && terms) {
+    setActiveTerms(terms);
+  }
+
+  const termData = {
+    isActive: isTermItemActive,
+    onClick: onClickTerm,
+    list: termsList,
+  };
+
+  const originalData = useMemo(
+    () =>
+      data && activeTerms
+        ? data.filter(({ term_desc }) => activeTerms.has(term_desc))
+        : null,
+    [data, activeTerms]
+  );
 
   const filteredData = useMemo(() => {
     if (Array.isArray(originalData)) {
@@ -379,7 +396,13 @@ export const AppContextProvider = ({ children }) => {
     return defaultReturn;
   }, [getVisualizationData, onBarClicked, handleActiveBarCell]);
 
-  const context = { waiverTypeData, semesterData, studentData, programData };
+  const context = {
+    waiverTypeData,
+    semesterData,
+    studentData,
+    programData,
+    termData,
+  };
 
   return <AppContext.Provider value={context}>{children}</AppContext.Provider>;
 };
