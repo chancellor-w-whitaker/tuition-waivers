@@ -13,7 +13,7 @@ import { usePromise } from "../hooks/usePromise";
 import { AppContext } from "./utils/AppContext";
 import { groupBy } from "./helpers/groupBy";
 
-const onFirstDataRendered = ({ api }) => api.sizeColumnsToFit();
+const onFirstDataRendered = ({ api }) => {};
 
 const onGridSizeChanged = (e) =>
   e.clientWidth < (e.api.getColumnDefs().length + 1) * 75
