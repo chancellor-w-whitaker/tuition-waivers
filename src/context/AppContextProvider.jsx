@@ -13,8 +13,6 @@ import { usePromise } from "../hooks/usePromise";
 import { AppContext } from "./utils/AppContext";
 import { groupBy } from "./helpers/groupBy";
 
-const onFirstDataRendered = ({ api }) => {};
-
 const onGridSizeChanged = (e) =>
   e.clientWidth < (e.api.getColumnDefs().length + 1) * 75
     ? e.api.autoSizeAllColumns()
@@ -184,7 +182,7 @@ export const AppContextProvider = ({ children }) => {
 
   const [activeTerms, setActiveTerms] = useState();
 
-  const onClickTerm = (term) =>
+  const onTermChange = ({ target: { value: term } }) =>
     setActiveTerms((state) =>
       state.has(term)
         ? new Set([...state].filter((element) => element !== term))
@@ -198,8 +196,8 @@ export const AppContextProvider = ({ children }) => {
   }
 
   const termData = {
-    isActive: isTermItemActive,
-    onClick: onClickTerm,
+    isChecked: isTermItemActive,
+    onChange: onTermChange,
     list: termsList,
   };
 
@@ -239,7 +237,6 @@ export const AppContextProvider = ({ children }) => {
       getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
       ref: programGridRef,
-      onFirstDataRendered,
       onGridSizeChanged,
       onRowDataUpdated,
       columnDefs: [],
@@ -272,7 +269,6 @@ export const AppContextProvider = ({ children }) => {
       getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
       ref: studentGridRef,
-      onFirstDataRendered,
       onGridSizeChanged,
       onRowDataUpdated,
       columnDefs: [],

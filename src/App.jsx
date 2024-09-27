@@ -16,21 +16,39 @@ export default function App() {
         <h1 className="h2">Employee Tuition Waivers</h1>
         <Popover
           openUp={
-            <ul className="dropdown-menu d-block">
-              {termData.list.map((term) => (
-                <li key={term}>
-                  <button
-                    className={`dropdown-item${
-                      termData.isActive(term) ? " active" : ""
-                    }`}
-                    onClick={() => termData.onClick(term)}
-                    type="button"
-                  >
-                    {term}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="list-group text-nowrap">
+              {termData.list.map((term) => {
+                return (
+                  <label className="list-group-item d-flex gap-2" key={term}>
+                    <input
+                      className="form-check-input flex-shrink-0"
+                      checked={termData.isChecked(term)}
+                      onChange={termData.onChange}
+                      type="checkbox"
+                      value={term}
+                      name="terms"
+                    />
+                    <span>{term}</span>
+                  </label>
+                );
+              })}
+            </div>
+
+            // <ul className="dropdown-menu d-block">
+            //   {termData.list.map((term) => (
+            //     <li key={term}>
+            //       <button
+            //         className={`dropdown-item${
+            //           termData.isActive(term) ? " active" : ""
+            //         }`}
+            //         onClick={() => termData.onClick(term)}
+            //         type="button"
+            //       >
+            //         {term}
+            //       </button>
+            //     </li>
+            //   ))}
+            // </ul>
           }
           openWith={
             <button className="btn btn-secondary dropdown-toggle" type="button">
