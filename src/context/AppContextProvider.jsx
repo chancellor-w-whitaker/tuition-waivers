@@ -182,6 +182,12 @@ export const AppContextProvider = ({ children }) => {
 
   const [activeTerms, setActiveTerms] = useState();
 
+  const allTermsAreChecked =
+    activeTerms && termsList && activeTerms.size === termsList.length;
+
+  const onAllTermsChange = () =>
+    setActiveTerms(allTermsAreChecked ? new Set() : new Set(termsList));
+
   const onTermChange = ({ target: { value: term } }) =>
     setActiveTerms((state) =>
       state.has(term)
@@ -196,6 +202,8 @@ export const AppContextProvider = ({ children }) => {
   }
 
   const termData = {
+    allAreChecked: allTermsAreChecked,
+    onAllChange: onAllTermsChange,
     isChecked: isTermItemActive,
     onChange: onTermChange,
     list: termsList,

@@ -17,6 +17,16 @@ export default function App() {
         <Popover
           openUp={
             <div className="list-group text-nowrap">
+              <label className="list-group-item d-flex gap-2">
+                <input
+                  className="form-check-input flex-shrink-0"
+                  checked={termData.allAreChecked}
+                  onChange={termData.onAllChange}
+                  type="checkbox"
+                  name="terms"
+                />
+                <span>{"All"}</span>
+              </label>
               {termData.list.map((term) => {
                 return (
                   <label className="list-group-item d-flex gap-2" key={term}>
