@@ -15,6 +15,11 @@ import { groupBy } from "./helpers/groupBy";
 
 const onFirstDataRendered = ({ api }) => api.sizeColumnsToFit();
 
+const onGridSizeChanged = (e) =>
+  e.clientWidth < (e.api.getColumnDefs().length + 1) * 75
+    ? e.api.autoSizeAllColumns()
+    : e.api.sizeColumnsToFit();
+
 // add term filter
 // maybe opt to sticky active rows instead of repositioning the scroll position
 const quantifyTerm = (termDesc) => {
@@ -235,6 +240,7 @@ export const AppContextProvider = ({ children }) => {
       pinnedBottomRowData: [],
       ref: programGridRef,
       onFirstDataRendered,
+      onGridSizeChanged,
       onRowDataUpdated,
       columnDefs: [],
       onRowClicked,
@@ -267,6 +273,7 @@ export const AppContextProvider = ({ children }) => {
       pinnedBottomRowData: [],
       ref: studentGridRef,
       onFirstDataRendered,
+      onGridSizeChanged,
       onRowDataUpdated,
       columnDefs: [],
       onRowClicked,
