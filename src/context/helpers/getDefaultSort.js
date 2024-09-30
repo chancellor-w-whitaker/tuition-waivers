@@ -1,6 +1,6 @@
 const defaultSort = {
+  distinct_eku_id: "desc",
   student_amount: "desc",
-  distinct_eku_id: "asc",
 };
 
 export const getDefaultSort = (field) =>

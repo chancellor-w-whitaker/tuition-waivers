@@ -7,13 +7,26 @@ import { EvenOddGrid } from "./components/EvenOddGrid";
 import { Popover } from "./components/Popover";
 
 export default function App() {
-  const { waiverTypeData, semesterData, programData, studentData, termData } =
-    useAppContext();
+  const {
+    resetButtonData,
+    waiverTypeData,
+    semesterData,
+    programData,
+    studentData,
+    termData,
+  } = useAppContext();
 
   return (
     <div>
-      <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+      <div className="d-flex gap-2 flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
         <h1 className="h2">Employee Tuition Waivers</h1>
+        <button
+          className="btn btn-danger ms-auto"
+          type="button"
+          {...resetButtonData}
+        >
+          Reset Visualizations
+        </button>
         <Popover
           openUp={
             <div className="list-group text-nowrap">
@@ -43,7 +56,6 @@ export default function App() {
                 );
               })}
             </div>
-
             // <ul className="dropdown-menu d-block">
             //   {termData.list.map((term) => (
             //     <li key={term}>

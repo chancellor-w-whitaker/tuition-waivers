@@ -4,29 +4,19 @@ import { lesserFillOpacityValue } from "./constants/lesserFillOpacityValue";
 import { formatNumberWithCommas } from "./helpers/formatNumberWithCommas";
 import { formatCompactNumber } from "./helpers/formatCompactNumber";
 import { visualizationIDs } from "./constants/visualizationIDs";
+import { onGridSizeChanged } from "./helpers/onGridSizeChanged";
 import { getDataGridProps } from "./helpers/getDataGridProps";
 import { getPieCellColor } from "./helpers/getPieCellColor";
 import { getPieCellName } from "./helpers/getPieCellName";
 import { dataPromise } from "./constants/dataPromise";
+import { quantifyTerm } from "./helpers/quantifyTerm";
 import { getRowData } from "./helpers/getRowData";
 import { usePromise } from "../hooks/usePromise";
 import { AppContext } from "./utils/AppContext";
 import { groupBy } from "./helpers/groupBy";
 
-const onGridSizeChanged = (e) =>
-  e.clientWidth < (e.api.getColumnDefs().length + 1) * 75
-    ? e.api.autoSizeAllColumns()
-    : e.api.sizeColumnsToFit();
-
 // add term filter
 // maybe opt to sticky active rows instead of repositioning the scroll position
-const quantifyTerm = (termDesc) => {
-  const [season, year] = termDesc.split(" ");
-
-  const seasons = ["spring", "summer", "fall"];
-
-  return Number(year + seasons.indexOf(season.toLowerCase()));
-};
 
 export const AppContextProvider = ({ children }) => {
   const programGridRef = useRef();
@@ -34,6 +24,34 @@ export const AppContextProvider = ({ children }) => {
   const studentGridRef = useRef();
 
   const [activeValues, setActiveValues] = useState([]);
+
+  const resetButtonIsDisabled = activeValues.length === 0;
+
+  const onClickResetButton = () => setActiveValues([]);
+
+  const resetButtonData = {
+    disabled: resetButtonIsDisabled,
+    onClick: onClickResetButton,
+  };
+
+  const getPinnedTopRowData = useCallback(
+    ({ visualizationID, rowData }) => {
+      const activeKey = activeValues.length > 0 ? activeValues[0].key : null;
+
+      if (visualizationID === activeKey) {
+        const setOfActiveValues = new Set(
+          activeKey ? activeValues.map(({ value }) => value) : []
+        );
+
+        return rowData.filter((row) =>
+          setOfActiveValues.has(row[visualizationID])
+        );
+      }
+
+      return [];
+    },
+    [activeValues]
+  );
 
   const isCellIrrelevant = useCallback(
     ({ entry, id }) => {
@@ -102,26 +120,26 @@ export const AppContextProvider = ({ children }) => {
 
     const nextActiveValue = { value: e.data[id], key: id };
 
-    !e.node.rowPinned && updateActiveRow(nextActiveValue);
+    e.node.rowPinned !== "bottom" && updateActiveRow(nextActiveValue);
   }, []);
 
-  const onRowDataUpdated = useCallback(
-    (e) => {
-      let id;
+  // const onRowDataUpdated = useCallback(
+  //   (e) => {
+  //     let id;
 
-      if (e.api === programGridRef.current.api) id = visualizationIDs.program;
+  //     if (e.api === programGridRef.current.api) id = visualizationIDs.program;
 
-      if (e.api === studentGridRef.current.api) id = visualizationIDs.student;
+  //     if (e.api === studentGridRef.current.api) id = visualizationIDs.student;
 
-      if (activeValues.some(({ key }) => key === id)) {
-        e.api.ensureNodeVisible(
-          (node) =>
-            node.data[id] === activeValues[activeValues.length - 1].value
-        );
-      }
-    },
-    [activeValues]
-  );
+  //     if (activeValues.some(({ key }) => key === id)) {
+  //       e.api.ensureNodeVisible(
+  //         (node) =>
+  //           node.data[id] === activeValues[activeValues.length - 1].value
+  //       );
+  //     }
+  //   },
+  //   [activeValues]
+  // );
 
   const handleActiveRowClass = useCallback(
     (e) => {
@@ -246,7 +264,7 @@ export const AppContextProvider = ({ children }) => {
       pinnedBottomRowData: [],
       ref: programGridRef,
       onGridSizeChanged,
-      onRowDataUpdated,
+      // onRowDataUpdated,
       columnDefs: [],
       onRowClicked,
       rowData: [],
@@ -257,7 +275,12 @@ export const AppContextProvider = ({ children }) => {
 
       const dataGridProps = getDataGridProps({ visualizationID, groupedData });
 
-      return { ...defaultReturn, ...dataGridProps };
+      const pinnedTopRowData = getPinnedTopRowData({
+        rowData: dataGridProps.rowData,
+        visualizationID,
+      });
+
+      return { ...defaultReturn, ...dataGridProps, pinnedTopRowData };
     }
 
     return defaultReturn;
@@ -265,7 +288,8 @@ export const AppContextProvider = ({ children }) => {
     getVisualizationData,
     onRowClicked,
     handleActiveRowClass,
-    onRowDataUpdated,
+    // onRowDataUpdated,
+    getPinnedTopRowData,
   ]);
 
   const studentData = useMemo(() => {
@@ -278,7 +302,7 @@ export const AppContextProvider = ({ children }) => {
       pinnedBottomRowData: [],
       ref: studentGridRef,
       onGridSizeChanged,
-      onRowDataUpdated,
+      // onRowDataUpdated,
       columnDefs: [],
       onRowClicked,
       rowData: [],
@@ -312,10 +336,16 @@ export const AppContextProvider = ({ children }) => {
       const sortColumnDefs = ({ field: fieldA }, { field: fieldB }) =>
         evaluateFieldPosition(fieldA) - evaluateFieldPosition(fieldB);
 
+      const pinnedTopRowData = getPinnedTopRowData({
+        rowData: dataGridProps.rowData,
+        visualizationID,
+      });
+
       return {
         ...defaultReturn,
         ...dataGridProps,
         columnDefs: dataGridProps.columnDefs.sort(sortColumnDefs),
+        pinnedTopRowData,
       };
     }
 
@@ -324,7 +354,8 @@ export const AppContextProvider = ({ children }) => {
     getVisualizationData,
     onRowClicked,
     handleActiveRowClass,
-    onRowDataUpdated,
+    // onRowDataUpdated,
+    getPinnedTopRowData,
   ]);
 
   const waiverTypeData = useMemo(() => {
@@ -408,6 +439,7 @@ export const AppContextProvider = ({ children }) => {
   }, [getVisualizationData, onBarClicked, handleActiveBarCell]);
 
   const context = {
+    resetButtonData,
     waiverTypeData,
     semesterData,
     studentData,
