@@ -39,3 +39,14 @@
 .page.col-xxl-10 {
   width: 100%;
 }
+
+.ag-floating-top-container > .ag-row-pinned::before {
+  content: "";
+  background-color: var(--ag-row-hover-color);
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}

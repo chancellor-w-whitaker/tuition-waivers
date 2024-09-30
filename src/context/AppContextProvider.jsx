@@ -15,8 +15,8 @@ import { usePromise } from "../hooks/usePromise";
 import { AppContext } from "./utils/AppContext";
 import { groupBy } from "./helpers/groupBy";
 
-// add term filter
-// maybe opt to sticky active rows instead of repositioning the scroll position
+// change bg color of pinned ones
+// filter out selected
 
 export const AppContextProvider = ({ children }) => {
   const programGridRef = useRef();
@@ -262,6 +262,7 @@ export const AppContextProvider = ({ children }) => {
     const defaultReturn = {
       getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
+      pinnedTopRowData: [],
       ref: programGridRef,
       onGridSizeChanged,
       // onRowDataUpdated,
@@ -280,7 +281,18 @@ export const AppContextProvider = ({ children }) => {
         visualizationID,
       });
 
-      return { ...defaultReturn, ...dataGridProps, pinnedTopRowData };
+      const topPinnedSet = new Set(pinnedTopRowData);
+
+      const filteredRowData = dataGridProps.rowData.filter(
+        (row) => !topPinnedSet.has(row)
+      );
+
+      return {
+        ...defaultReturn,
+        ...dataGridProps,
+        rowData: filteredRowData,
+        pinnedTopRowData,
+      };
     }
 
     return defaultReturn;
@@ -300,6 +312,7 @@ export const AppContextProvider = ({ children }) => {
     const defaultReturn = {
       getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
+      pinnedTopRowData: [],
       ref: studentGridRef,
       onGridSizeChanged,
       // onRowDataUpdated,
@@ -341,10 +354,17 @@ export const AppContextProvider = ({ children }) => {
         visualizationID,
       });
 
+      const topPinnedSet = new Set(pinnedTopRowData);
+
+      const filteredRowData = dataGridProps.rowData.filter(
+        (row) => !topPinnedSet.has(row)
+      );
+
       return {
         ...defaultReturn,
         ...dataGridProps,
         columnDefs: dataGridProps.columnDefs.sort(sortColumnDefs),
+        rowData: filteredRowData,
         pinnedTopRowData,
       };
     }
