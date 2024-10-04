@@ -183,56 +183,35 @@ export const AppContextProvider = ({ children }) => {
     updateActiveCell(nextActiveValue);
   }, []);
 
-  const data = usePromise(dataPromise);
+  const dataPromised = usePromise(dataPromise);
 
-  const terms = useMemo(
+  const data = useMemo(
     () =>
-      Array.isArray(data)
-        ? new Set(data.map(({ term_desc }) => term_desc))
-        : null,
-    [data]
+      dataPromised &&
+      dataPromised.filter(({ student_waiver_type }) => student_waiver_type),
+    [dataPromised]
   );
 
-  const termsList =
-    terms && terms.size > 0
-      ? [...terms].sort((a, b) => quantifyTerm(a) - quantifyTerm(b))
-      : [];
+  const { props: termFilterProps, active: activeTerms } = useValuesFilter({
+    sortMethod: (a, b) => quantifyTerm(a) - quantifyTerm(b),
+    key: "term_desc",
+    data,
+  });
 
-  const [activeTerms, setActiveTerms] = useState();
-
-  const allTermsAreChecked =
-    activeTerms && termsList && activeTerms.size === termsList.length;
-
-  const onAllTermsChange = () =>
-    setActiveTerms(allTermsAreChecked ? new Set() : new Set(termsList));
-
-  const onTermChange = ({ target: { value: term } }) =>
-    setActiveTerms((state) =>
-      state.has(term)
-        ? new Set([...state].filter((element) => element !== term))
-        : new Set([term, ...state])
-    );
-
-  const isTermItemActive = (term) => activeTerms.has(term);
-
-  if (!activeTerms && terms) {
-    setActiveTerms(terms);
-  }
-
-  const termData = {
-    allAreChecked: allTermsAreChecked,
-    onAllChange: onAllTermsChange,
-    isChecked: isTermItemActive,
-    onChange: onTermChange,
-    list: termsList,
-  };
+  const { props: typeFilterProps, active: activeTypes } = useValuesFilter({
+    key: "student_waiver_type",
+    data,
+  });
 
   const originalData = useMemo(
     () =>
-      data && activeTerms
-        ? data.filter(({ term_desc }) => activeTerms.has(term_desc))
+      data && activeTerms && activeTypes
+        ? data.filter(
+            ({ student_waiver_type, term_desc }) =>
+              activeTerms.has(term_desc) && activeTypes.has(student_waiver_type)
+          )
         : null,
-    [data, activeTerms]
+    [data, activeTerms, activeTypes]
   );
 
   const filteredData = useMemo(() => {
@@ -260,6 +239,7 @@ export const AppContextProvider = ({ children }) => {
     const data = getVisualizationData(visualizationID);
 
     const defaultReturn = {
+      onRowDataUpdated: onGridSizeChanged,
       getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
       pinnedTopRowData: [],
@@ -310,6 +290,7 @@ export const AppContextProvider = ({ children }) => {
     const data = getVisualizationData(visualizationID);
 
     const defaultReturn = {
+      onRowDataUpdated: onGridSizeChanged,
       getRowClass: handleActiveRowClass,
       pinnedBottomRowData: [],
       pinnedTopRowData: [],
@@ -459,13 +440,56 @@ export const AppContextProvider = ({ children }) => {
   }, [getVisualizationData, onBarClicked, handleActiveBarCell]);
 
   const context = {
+    termData: termFilterProps,
+    typeData: typeFilterProps,
     resetButtonData,
     waiverTypeData,
     semesterData,
     studentData,
     programData,
-    termData,
   };
 
   return <AppContext.Provider value={context}>{children}</AppContext.Provider>;
+};
+
+const useValuesFilter = ({ sortMethod, data, key }) => {
+  const values = useMemo(
+    () =>
+      Array.isArray(data)
+        ? new Set(data.map(({ [key]: value }) => value))
+        : null,
+    [data, key]
+  );
+
+  const valuesList =
+    values && values.size > 0 ? [...values].sort(sortMethod) : [];
+
+  const [activeValues, setActiveValues] = useState();
+
+  const allValuesAreChecked =
+    activeValues && valuesList && activeValues.size === valuesList.length;
+
+  const onAllValuesChange = () =>
+    setActiveValues(allValuesAreChecked ? new Set() : new Set(valuesList));
+
+  const onValueChange = ({ target: { value } }) =>
+    setActiveValues((state) =>
+      state.has(value)
+        ? new Set([...state].filter((element) => element !== value))
+        : new Set([value, ...state])
+    );
+
+  const isValueItemActive = (value) => activeValues.has(value);
+
+  if (!activeValues && values) setActiveValues(values);
+
+  const valueData = {
+    allAreChecked: allValuesAreChecked,
+    onAllChange: onAllValuesChange,
+    isChecked: isValueItemActive,
+    onChange: onValueChange,
+    list: valuesList,
+  };
+
+  return { active: activeValues, props: valueData };
 };

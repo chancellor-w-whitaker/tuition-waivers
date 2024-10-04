@@ -14,6 +14,7 @@ export default function App() {
     programData,
     studentData,
     termData,
+    typeData,
   } = useAppContext();
 
   return (
@@ -78,8 +79,58 @@ export default function App() {
             </button>
           }
         ></Popover>
+        <Popover
+          openUp={
+            <div className="list-group text-nowrap">
+              <label className="list-group-item d-flex gap-2">
+                <input
+                  className="form-check-input flex-shrink-0"
+                  checked={typeData.allAreChecked}
+                  onChange={typeData.onAllChange}
+                  type="checkbox"
+                  name="types"
+                />
+                <span>{"All"}</span>
+              </label>
+              {typeData.list.map((type) => {
+                return (
+                  <label className="list-group-item d-flex gap-2" key={type}>
+                    <input
+                      className="form-check-input flex-shrink-0"
+                      checked={typeData.isChecked(type)}
+                      onChange={typeData.onChange}
+                      type="checkbox"
+                      value={type}
+                      name="types"
+                    />
+                    <span>{type}</span>
+                  </label>
+                );
+              })}
+            </div>
+            // <ul className="dropdown-menu d-block">
+            //   {termData.list.map((term) => (
+            //     <li key={term}>
+            //       <button
+            //         className={`dropdown-item${
+            //           termData.isActive(term) ? " active" : ""
+            //         }`}
+            //         onClick={() => termData.onClick(term)}
+            //         type="button"
+            //       >
+            //         {term}
+            //       </button>
+            //     </li>
+            //   ))}
+            // </ul>
+          }
+          openWith={
+            <button className="btn btn-secondary dropdown-toggle" type="button">
+              Types
+            </button>
+          }
+        ></Popover>
       </div>
-
       <EvenOddGrid>
         <div className="ag-theme-balham" style={{ height: 500 }}>
           <AgGridReact {...programData} />
