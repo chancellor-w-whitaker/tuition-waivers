@@ -13,8 +13,5 @@ import { RemoteComponent } from "./RemoteComponent";
 // https://stackblitz.com/edit/vitejs-vite-myxwzz?file=src%2FApp.jsx&terminal=dev
 
 export const Wrapper = (props) => (
-  <RemoteComponent
-    url="https://raw.githubusercontent.com/chamce/remote-starter/master/dist/wrapper.cjs"
-    {...props}
-  />
+  <RemoteComponent url={import.meta.env.wrapperUrl} {...props} />
 );
